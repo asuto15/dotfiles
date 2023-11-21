@@ -1,0 +1,3 @@
+# bat default theme
+export BAT_THEME="Visual Studio Dark+"
+
