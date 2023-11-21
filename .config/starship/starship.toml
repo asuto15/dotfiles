@@ -1,0 +1,48 @@
+add_newline = true
+
+[directory]
+truncation_length = 10
+truncate_to_repo = false
+
+[git_status]
+conflicted = "💥"
+ahead = "🏎💨"
+behind = "🥲"
+diverged = "😵"
+untracked = "🌚"
+stashed = "📦"
+modified = "📝"
+staged = '🔦'
+renamed = "🏷"
+deleted = "🗑"
+
+[[battery.display]]
+# バッテリー残量が常に表示されるように設定
+threshold = 100
+style = "bold blue"
+
+[battery]
+full_symbol = "🤗"
+charging_symbol = "😌"
+discharging_symbol = "😨"
+
+[time]
+disabled = false
+# 12時間表示に設定
+use_12hr = false
+
+[memory_usage]
+disabled = false
+# 常にメモリ使用率が表示されるように設定
+threshold = -1
+style = "bold dimmed green"
+
+[character]
+success_symbol = "[>>](bold green)"
+error_symbol = "[>>](bold red)"
+
+[package]
+disabled = false
+
+[aws.region_aliases]
+ap-northeast-1 = "jp"
