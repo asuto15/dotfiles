@@ -4,4 +4,7 @@
 [core]
 	editor = vim
 [sequence]
-	editor = vim
+  editor = vim
+[color]
+  ui = true
+
