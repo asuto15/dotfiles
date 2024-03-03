@@ -5,15 +5,17 @@ DOT_DIR="$HOME/dotfiles"
 cd $DOT_DIR
 
 echo "install on $(uname -n)"
-case $(uname -n) in
-  "UbuntuonWSL2onG3")
+case $(uname -s) in
+  "Linux")
     echo "make static link .bashrc"
     ln -sf $HOME/dotfiles/.bashrc $HOME/.bashrc
     echo "make static link nvim config"
-    mkdir $HOME/.config/nvim
+    mkdir -p $HOME/.config/nvim
     ln -sf $HOME/dotfiles/.config/nvim/init.vim $HOME/.config/nvim/init.vim
     ln -sf $HOME/dotfiles/.config/nvim/dein.vim $HOME/.config/nvim/dein.vim
     ln -sf $HOME/dotfiles/.config/nvim/dein_lazy.toml $HOME/.config/nvim/dein_lazy.toml
+    echo "make static link tmux config"
+    ln -sf $HOME/dotfiles/.tmux.conf $HOME/.tmux.conf
     ;;
   "KernelHackHost")
     echo "make static link .bashrc"
@@ -27,3 +29,5 @@ case $(uname -n) in
   *)
     ;;
 esac
+
+source $HOME/.bashrc
