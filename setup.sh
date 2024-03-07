@@ -42,7 +42,9 @@ case $(uname -s) in
     ln -sf $HOME/dotfiles/.tmux.conf $HOME/.tmux.conf
 
     echo "install rustup"
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+    if ! [[ $(command -v rustup) ]]; then
+      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+    fi
     ;;
   *)
     ;;
