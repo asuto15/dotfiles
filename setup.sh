@@ -33,6 +33,7 @@ case $(uname -s) in
 
     echo "make static link .bashrc"
     ln -sf $HOME/dotfiles/.bashrc $HOME/.bashrc
+    ln -sf $HOME/dotfiles/.aliases $HOME/.aliases
     echo "make static link nvim config"
     mkdir -p $HOME/.config/nvim
     ln -sf $HOME/dotfiles/.config/nvim/init.vim $HOME/.config/nvim/init.vim
