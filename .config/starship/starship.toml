@@ -1,48 +1,90 @@
+format = """$username[@](bold white)$hostname$directory$git_branch$git_commit$git_state$git_metrics$git_status$all
+$cmd_duration$time$memory_usage$battery$line_break$character"""
 add_newline = true
 
+[username]
+style_user = 'bold white'
+style_root = 'bold black'
+format = '[$user]($style)'
+disabled = false
+show_always = true
+
+[hostname]
+ssh_only = false
+format = '[$ssh_symbol$hostname]($style) in '
+style = 'bold white'
+
 [directory]
+format = '[$path]($style)[$read_only]($read_only_style) '
+style = 'bold cyan'
+read_only = '🔒'
+read_only_style = 'red'
+truncation_symbol = '.../'
 truncation_length = 10
 truncate_to_repo = false
 
+[git_branch]
+always_show_remote = true
+
+[git_commit]
+tag_disabled = false
+
+[git_state]
+format = '[\($state( $progress_current of $progress_total)\)]($style) '
+
+[git_metrics]
+disabled = false
+
 [git_status]
+format = '([\[$all_status$ahead_behind\]]($style) )'
+style = 'bold red'
 conflicted = "💥"
-ahead = "🏎💨"
-behind = "🥲"
-diverged = "😵"
-untracked = "🌚"
-stashed = "📦"
-modified = "📝"
-staged = '🔦'
-renamed = "🏷"
-deleted = "🗑"
-
-[[battery.display]]
-# バッテリー残量が常に表示されるように設定
-threshold = 100
-style = "bold blue"
-
-[battery]
-full_symbol = "🤗"
-charging_symbol = "😌"
-discharging_symbol = "😨"
-
-[time]
-disabled = false
-# 12時間表示に設定
-use_12hr = false
-
-[memory_usage]
-disabled = false
-# 常にメモリ使用率が表示されるように設定
-threshold = -1
-style = "bold dimmed green"
-
-[character]
-success_symbol = "[>>](bold green)"
-error_symbol = "[>>](bold red)"
+ahead = "⇡"
+behind = "⇣"
+diverged = "⇕"
+untracked = "?"
+stashed = "s"
+modified = "!"
+staged = '+'
+renamed = ">>"
+deleted = "x"
 
 [package]
 disabled = false
 
 [aws.region_aliases]
 ap-northeast-1 = "jp"
+
+[os]
+format = '[$symbol$name $version]($style)'
+style = 'bold blue'
+disabled = false
+
+[cmd_duration]
+show_milliseconds = true
+min_time = 1000
+
+[time]
+disabled = false
+format = '🕙[$time]($style) '
+time_format = '%+'
+
+[memory_usage]
+disabled = false
+threshold = -1
+format = 'via $symbol [$ram\($ram_pct\)]($style) '
+style = "bold dimmed green"
+
+[battery]
+full_symbol = "🤗"
+charging_symbol = "😌"
+discharging_symbol = "😨"
+
+[[battery.display]]
+threshold = 100
+style = "bold blue"
+
+[character]
+success_symbol = "[>>](bold green)"
+error_symbol = "[>>](bold red)"
+
