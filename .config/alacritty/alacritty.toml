@@ -58,6 +58,12 @@ action = "Paste"
 mods = "Shift"
 mouse = "Right"
 
+[keyboard]
+bindings = [
+{ key = "N", mods = "Command", action = "SelectNextTab" },
+{ key = "P", mods = "Command", action = "SelectPreviousTab" },
+]
+
 [window]
 opacity = 1.0
 
