@@ -12,12 +12,10 @@ show_always = true
 [hostname]
 ssh_only = false
 format = '[@$ssh_symbol$hostname]($style)'
-style = 'bold white'
 
 [localip]
 ssh_only = false
 format = '[\($localipv4\)]($style) '
-style = 'bold white'
 disabled = false
 
 [directory]
@@ -82,9 +80,9 @@ format = 'via $symbol [$ram\($ram_pct\)]($style) '
 style = "bold dimmed green"
 
 [battery]
-full_symbol = "🤗"
-charging_symbol = "😌"
-discharging_symbol = "😨"
+full_symbol = "🔋"
+charging_symbol = "⚡️"
+discharging_symbol = "💀"
 
 [[battery.display]]
 threshold = 100
