@@ -1,0 +1,131 @@
+# git
+if [[ $(command -v git) ]]; then
+  alias g='git'
+  alias ga='git add'
+  alias gaa='git add --all'
+  alias gb='git branch'
+  alias gc='git commit -v'
+  alias gch='git checkout'
+  alias gpl='git pull'
+  alias gps='git push'
+  alias gs='git status -sb'
+  alias gst='git stash'
+  alias gsta='git stash apply'
+fi
+
+# brew
+if [[ $(command -v brew) ]]; then
+  alias brewup='brew update && brew upgrade && brew cleanup'
+fi
+
+# tmux
+if [[ $(command -v tmux) ]]; then
+  alias tmux='tmux -2'
+fi
+
+# nvim
+if [[ $(command -v nvim) ]]; then
+  alias vim='nvim'
+  alias vi='nvim'
+  alias v='nvim'
+fi
+
+# starship
+if [[ $(command -v starship) ]]; then
+  eval "$(starship init zsh)"
+fi
+
+# anyenv
+if [[ $(command -v anyenv) ]]; then
+  eval "$(anyenv init -)"
+fi
+
+# fzf
+[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+export FZF_DEFAULT_COMMAND='rg --files --hidden --follow --glob "!.git/*"'
+export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border'
+
+# fbr - checkout git branch including remote branches
+fbr() {
+  local branches branch
+  branches=$(git branch --all | grep -v HEAD) &&
+  branch=$(echo "$branches" |
+    fzf-tmux -d 40% --reverse --prompt="Checkout branch > " --preview="git log -n 20 --pretty=oneline --color=always {}" |
+    sed "s/.* //" |
+    sed "s#remotes/[^/]*/##") &&
+  git checkout "$branch"
+}
+
+# fshow - git commit browser
+fshow() {
+  git log --graph --color=always \
+    --format="%C(auto)%h%d %s %C(black)%C(bold)%cr" "$@" |
+  fzf --ansi --no-sort --reverse --tiebreak=index --bind=ctrl-s:toggle-sort \
+    --bind "ctrl-m:execute:
+      (grep -o '[a-f0-9]\{7\}' | head -1 |
+      xargs -I % sh -c 'git show --color=always % | less -R') << 'FZF-EOF'
+      {}
+FZF-EOF"
+}
+
+# fd
+if [[ $(command -v fd) ]]; then
+  alias find='fd'
+fi
+
+# ripgrep
+if [[ $(command -v rg) ]]; then
+  alias grep='rg --color=always --smart-case'
+fi
+
+# bat
+if [[ $(command -v bat) ]]; then
+  alias cat='bat --paging=never'
+fi
+
+# exa
+if [[ $(command -v exa) ]]; then
+  alias ls='exa --icons'
+  alias lt='exa -T -L 3 -a -I "node_modules|.git|.cache" --icons'
+  alias ltl='exa -T -L 3 -a -I "node_modules|.git|.cache" -l --icons'
+fi
+
+# tldr
+if [[ $(command -v tldr) ]]; then
+  alias tldr='tldr --theme="dark"'
+fi
+
+# tree
+if [[ $(command -v tree) ]]; then
+  alias tree='tree -du -h -a'
+fi
+
+# htop
+if [[ $(command -v htop) ]]; then
+  alias htop='htop -d 10'
+fi
+
+# httpie
+if [[ $(command -v http) ]]; then
+  alias http='http --style=fruity'
+fi
+if [[ $(command -v https) ]]; then
+  alias https='https --style=fruity'
+fi
+
+# jq
+if [[ $(command -v jq) ]]; then
+  alias jq='jq --color-output'
+fi
+
+# z
+if [[ $(command -v z) ]]; then
+  _z() {
+    local key
+    for key in "$@"; do
+      cd "$(z -e "$key")" || return 1
+    done
+  }
+  alias z=_z
+  alias j=_z
+fi

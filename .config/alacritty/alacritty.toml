@@ -23,7 +23,7 @@ white = "0xD0D0D0"
 yellow = "0xFEFF00"
 
 [colors.primary]
-background = "0x202020"
+background = "0x101010"
 foreground = "0xffffff"
 
 [font]
@@ -57,6 +57,12 @@ mouse = "Left"
 action = "Paste"
 mods = "Shift"
 mouse = "Right"
+
+[keyboard]
+bindings = [
+{ key = "N", mods = "Command", action = "SelectNextTab" },
+{ key = "P", mods = "Command", action = "SelectPreviousTab" },
+]
 
 [window]
 opacity = 1.0
