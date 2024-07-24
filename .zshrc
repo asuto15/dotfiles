@@ -1,3 +1,27 @@
+autoload -U compinit
+compinit
+
+_ssh_hosts() {
+  setopt localoptions nullglob
+  local -a compHosts files
+  local config="$HOME/.ssh/config"
+  local includes=($(awk '/^Include / {print $2}' $config))
+
+  for i in $includes; do
+    if [[ $i == /* ]]; then
+      files+=($~i)
+    else
+      files+=(~/.ssh/$~i)
+    fi
+  done
+  files+=($config)
+
+  compHosts=($(awk '/^Host / && $2 != "*" { if (!seen[$2]++) print $2 }' ${files[@]} ))
+  _wanted hosts expl host compadd -a compHosts
+}
+
+compdef _ssh_hosts ssh
+
 if [ -f ~/.aliases ]; then
   source ~/.aliases
 fi
