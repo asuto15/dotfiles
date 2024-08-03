@@ -31,6 +31,10 @@ case $(uname -s) in
       fi
     done
 
+    if ! [[ $(command -v nvim) ]]; then
+      sudo snap install -y nvim
+    fi
+
     echo "make static link .bashrc"
     ln -sf $HOME/dotfiles/.bashrc $HOME/.bashrc
     ln -sf $HOME/dotfiles/.aliases $HOME/.aliases
