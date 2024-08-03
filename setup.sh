@@ -15,7 +15,7 @@ case $(uname -s) in
       "fzf"
       "ripgrep"
       "bat"
-      "exa"
+      "eza"
       "tldr"
       "tree"
       "htop"
