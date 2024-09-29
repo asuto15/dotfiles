@@ -1,58 +1,55 @@
 #! bin/bash
-echo "setup dotfiles"
-DOT_DIR="$HOME/dotfiles"
-# git clone
-cd $DOT_DIR
+echo "Setting up dotfiles on $(uname -n)"
+DOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
-echo "install on $(uname -n)"
-case $(uname -s) in
-  "Linux")
-    echo "apt install commands"
-    sudo apt update && sudo apt upgrade -y
-    cmds=(
-      "git"
-      "tmux"
-      "fzf"
-      "ripgrep"
-      "bat"
-      "eza"
-      "tldr"
-      "tree"
-      "htop"
-      "wget"
-      "curl"
-      "httpie"
-      "jq"
-    )
+if [ ! -d "$DOT_DIR" ]; then
+  echo "Dotfiles directory not found at $DOT_DIR"
+  exit 1
+fi
 
-    for cmd in "${cmds[@]}"; do
-      if ! [[ $(command -v $cmd) ]]; then
-        sudo apt install -y $cmd
-      fi
-    done
+echo "Updating apt commands"
+sudo apt -qq update && sudo apt -qq upgrade -y
 
-    if ! [[ $(command -v nvim) ]]; then
-      sudo snap install -y nvim
-    fi
+cmds=(
+  "git"
+  "tmux"
+  "fzf"
+  "ripgrep"
+  "bat"
+  "eza"
+  "tldr"
+  "tree"
+  "htop"
+  "wget"
+  "curl"
+  "httpie"
+  "jq"
+)
 
-    echo "make static link .bashrc"
-    ln -sf $HOME/dotfiles/.bashrc $HOME/.bashrc
-    ln -sf $HOME/dotfiles/.aliases $HOME/.aliases
-    echo "make static link nvim config"
-    mkdir -p $HOME/.config/nvim
-    ln -sf $HOME/dotfiles/.config/nvim/init.vim $HOME/.config/nvim/init.vim
-    ln -sf $HOME/dotfiles/.config/nvim/dein.vim $HOME/.config/nvim/dein.vim
-    ln -sf $HOME/dotfiles/.config/nvim/dein_lazy.toml $HOME/.config/nvim/dein_lazy.toml
-    echo "make static link tmux config"
-    ln -sf $HOME/dotfiles/.tmux.conf $HOME/.tmux.conf
+echo "Installing apt commands"
+for cmd in "${cmds[@]}"; do
+  if ! command -v $cmd &> /dev/null; then
+    sudo apt -qq install -y $cmd
+  fi
+done
 
-    echo "install rustup"
-    if ! [[ $(command -v rustup) ]]; then
-      curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-    fi
-    ;;
-  *)
-    ;;
-esac
+echo "Installing nvim"
+if ! command -v nvim &> /dev/null; then
+  sudo snap install -y nvim
+fi
+
+echo "Create symbolic links for configuration files"
+[ "$(readlink $HOME/.bashrc)" != "$DOT_DIR/.bashrc" ] && ln -sf "$DOT_DIR/.bashrc" "$HOME/.bashrc"
+[ "$(readlink $HOME/.aliases)" != "$DOT_DIR/.aliases" ] && ln -sf "$DOT_DIR/.aliases" "$HOME/.aliases"
+mkdir -p "$HOME/.config/nvim"
+[ "$(readlink $HOME/.config/nvim/init.vim)" != "$DOT_DIR/.config/nvim/init.vim" ] && ln -sf "$DOT_DIR/.config/nvim/init.vim" "$HOME/.config/nvim/init.vim"
+[ "$(readlink $HOME/.config/nvim/dein.vim)" != "$DOT_DIR/.config/nvim/dein.vim" ] && ln -sf "$DOT_DIR/.config/nvim/dein.vim" "$HOME/.config/nvim/dein.vim"
+[ "$(readlink $HOME/.config/nvim/dein_lazy.toml)" != "$DOT_DIR/.config/nvim/dein_lazy.toml" ] && ln -sf "$DOT_DIR/.config/nvim/dein_lazy.toml" "$HOME/.config/nvim/dein_lazy.toml"
+[ "$(readlink $HOME/.tmux.conf)" != "$DOT_DIR/.tmux.conf" ] && ln -sf "$DOT_DIR/.tmux.conf" "$HOME/.tmux.conf"
+
+echo "Installing rustup"
+if ! command -v rustup &> /dev/null; then
+  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+fi
 
 source $HOME/.bashrc
