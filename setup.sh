@@ -15,7 +15,7 @@ case $(uname -s) in
       "fzf"
       "ripgrep"
       "bat"
-      "exa"
+      "eza"
       "tldr"
       "tree"
       "htop"
@@ -30,6 +30,10 @@ case $(uname -s) in
         sudo apt install -y $cmd
       fi
     done
+
+    if ! [[ $(command -v nvim) ]]; then
+      sudo snap install -y nvim
+    fi
 
     echo "make static link .bashrc"
     ln -sf $HOME/dotfiles/.bashrc $HOME/.bashrc
