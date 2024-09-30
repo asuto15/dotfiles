@@ -17,7 +17,7 @@ brew install fzf
 brew install fd
 brew install ripgrep
 brew install bat
-brew install exa
+brew install eza
 brew install tldr
 brew install tree
 brew install htop
