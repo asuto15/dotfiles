@@ -2,9 +2,12 @@
 	name = asuto15
 	email = sluggard0115@gmail.com
 [core]
-	editor = vim
+	editor = nvim
 [sequence]
-  editor = vim
+  editor = nvim
 [color]
   ui = true
-
+[init]
+  defaultBranch = main
+[pull]
+	rebase = false

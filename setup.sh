@@ -26,12 +26,19 @@ cmds=(
   "jq"
 )
 
-echo "Installing apt commands"
+missing_cmds=()
 for cmd in "${cmds[@]}"; do
   if ! command -v $cmd &> /dev/null; then
-    sudo apt -qq install -y $cmd
+    missing_cmds+=("$cmd")
   fi
 done
+
+if [ ${#missing_cmds[@]} -ne 0 ]; then
+  echo "Installing missing commands: ${missing_cmds[*]}"
+  sudo apt install -y -qq "${missing_cmds[@]}"
+else
+  echo "All commands are already installed."
+fi
 
 echo "Installing nvim"
 if ! command -v nvim &> /dev/null; then
