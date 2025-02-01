@@ -4,10 +4,10 @@
 [core]
 	editor = nvim
 [sequence]
-  editor = nvim
+	editor = nvim
 [color]
-  ui = true
+	ui = true
 [init]
-  defaultBranch = main
+	defaultBranch = main
 [pull]
 	rebase = false
