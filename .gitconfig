@@ -1,6 +1,7 @@
 [user]
 	name = asuto15
 	email = sluggard0115@gmail.com
+	signingkey = 690AB67B4751D0D6
 [core]
 	editor = nvim
 [sequence]
@@ -11,3 +12,5 @@
 	defaultBranch = main
 [pull]
 	rebase = false
+[commit]
+	gpgsign = true
