@@ -41,9 +41,12 @@ if [[ $(command -v anyenv) ]]; then
 fi
 
 # fzf
-[ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
-export FZF_DEFAULT_COMMAND='rg --files --hidden --follow --glob "!.git/*"'
-export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border'
+if [[ $(command -v fzf) ]]; then
+  eval "$(fzf --zsh)"
+  [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+  export FZF_DEFAULT_COMMAND='rg --files --hidden --follow --glob "!.git/*"'
+  export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border'
+fi
 
 # fbr - checkout git branch including remote branches
 fbr() {
