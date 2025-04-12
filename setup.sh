@@ -1,4 +1,4 @@
-#! bin/bash
+#!/bin/bash
 echo "Setting up dotfiles on $(uname -n)"
 DOT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
