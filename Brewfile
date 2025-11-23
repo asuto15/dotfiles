@@ -43,6 +43,7 @@ brew "jq"
 brew "llvm"
 brew "lld"
 brew "marp-cli"
+brew "mas"
 brew "neovim"
 brew "nginx"
 brew "nmap"
@@ -112,6 +113,19 @@ cask "wattsec"
 cask "wireshark-app"
 cask "zed"
 cask "zenmap"
+mas "DaVinci Resolve", id: 571213070
+mas "GarageBand", id: 682658836
+mas "Goodnotes", id: 1444383602
+mas "iMovie", id: 408981434
+mas "Keynote", id: 409183694
+mas "Kindle", id: 302584613
+mas "Microsoft Excel", id: 462058435
+mas "Microsoft PowerPoint", id: 462062816
+mas "Microsoft Remote Desktop", id: 1295203466
+mas "Microsoft Word", id: 462054704
+mas "Numbers", id: 409203825
+mas "Pages", id: 409201541
+mas "Slack", id: 803453959
 vscode "8amjp.charactercount"
 vscode "adamraichu.docx-viewer"
 vscode "alexcvzz.vscode-sqlite"
