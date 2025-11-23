@@ -1,0 +1,14 @@
+# Common CLI tools (installed on all platforms)
+git
+tmux
+fzf
+ripgrep
+bat
+eza
+tldr
+tree
+htop
+wget
+curl
+httpie
+jq

@@ -8,6 +8,9 @@ case $- in
       *) return;;
 esac
 
+DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]:-$HOME/.bashrc}")" && pwd)}"
+[ -f "${DOTFILES_DIR}/shell/common_env.sh" ] && . "${DOTFILES_DIR}/shell/common_env.sh"
+
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options
 HISTCONTROL=ignoreboth
@@ -109,6 +112,14 @@ if [ -f ~/.aliases ]; then
   source ~/.aliases
 fi
 
+if command -v anyenv >/dev/null 2>&1; then
+  eval "$(anyenv init -)"
+fi
+
+if command -v starship >/dev/null 2>&1; then
+  eval "$(starship init bash)"
+fi
+
 # enable programmable completion features (you don't need to enable
 # this, if it's already enabled in /etc/bash.bashrc and /etc/profile
 # sources /etc/bash.bashrc).
@@ -124,4 +135,3 @@ fi
 export NVM_DIR="$HOME/.nvm"
 [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
 [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
-

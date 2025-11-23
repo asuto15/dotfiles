@@ -1,6 +1,9 @@
 autoload -U compinit
 compinit
 
+DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "${(%):-%N}")" && pwd)}"
+[ -f "${DOTFILES_DIR}/shell/common_env.sh" ] && source "${DOTFILES_DIR}/shell/common_env.sh"
+
 _ssh_hosts() {
   setopt localoptions nullglob
   local -a compHosts files
@@ -26,17 +29,17 @@ if [ -f ~/.aliases ]; then
   source ~/.aliases
 fi
 
-export PATH=/Users/asuto153/.anyenv/envs/nodenv/shims:/Users/asuto153/.anyenv/envs/nodenv/bin:/Library/Frameworks/Python.framework/Versions/3.12/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/opt/homebrew/opt:/usr/local/bin:/System/Cryptexes/App/usr/bin:/usr/bin:/bin:/usr/sbin:/sbin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/local/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/bin:/var/run/com.apple.security.cryptexd/codex.system/bootstrap/usr/appleinternal/bin:/opt/X11/bin:/Users/asuto153/.cargo/bin:/Users/asuto153/.anyenv/envs/nodenv/versions/21.2.0/bin:/opt/homebrew/opt/ruby/bin:/usr/local/opt/llvm/bin
-export LDFLAGS="-L/opt/homebrew/opt/llvm/lib"
-export CPPFLAGS="-I/opt/homebrew/opt/llvm/include"
-export GPG_TTY=$(tty)
+if command -v starship >/dev/null 2>&1; then
+  eval "$(starship init zsh)"
+fi
 
-export LIBRARY_PATH="$LIBRARY_PATH:/opt/homebrew/lib:/opt/homebrew/Cellar:/usr/local/lib"
+if command -v anyenv >/dev/null 2>&1; then
+  eval "$(anyenv init -)"
+fi
 
-export STARSHIP_CONFIG="$HOME/.config/starship/starship.toml"
-export STARSHIP_CACHE="$HOME/.starship/cache"
-
-eval "$(starship init zsh)"
-
-. "$HOME/.local/bin/env"
-source /Users/asuto153/.local/bin/env
+if command -v fzf >/dev/null 2>&1; then
+  eval "$(fzf --zsh)"
+  [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
+  export FZF_DEFAULT_COMMAND='rg --files --hidden --follow --glob "!.git/*"'
+  export FZF_DEFAULT_OPTS='--height 40% --layout=reverse --border'
+fi

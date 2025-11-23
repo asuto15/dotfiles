@@ -33,18 +33,8 @@ if [[ $(command -v nvim) ]]; then
   alias v='nvim'
 fi
 
-# starship
-if [[ $(command -v starship) ]]; then
-  eval "$(starship init zsh)"
-fi
-
-# anyenv
-if [[ $(command -v anyenv) ]]; then
-  eval "$(anyenv init -)"
-fi
-
 # fzf
-if [[ $(command -v fzf) ]]; then
+if [[ -n "${ZSH_VERSION:-}" && $(command -v fzf) ]]; then
   eval "$(fzf --zsh)"
   [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
   export FZF_DEFAULT_COMMAND='rg --files --hidden --follow --glob "!.git/*"'
