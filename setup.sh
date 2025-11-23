@@ -24,6 +24,8 @@ cmds=(
   "curl"
   "httpie"
   "jq"
+  "snap"
+  "build-essential"
 )
 
 missing_cmds=()
