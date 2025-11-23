@@ -1,0 +1,9 @@
+bootimage
+cargo-audit
+cargo-edit
+cargo-generate
+cargo-outdated
+cargo-watch
+mdbook
+wasm-bindgen-cli
+wasm-pack
