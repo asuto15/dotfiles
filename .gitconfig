@@ -1,7 +1,7 @@
 [user]
 	name = asuto15
-	email = sluggard0115@gmail.com
-	signingkey = 690AB67B4751D0D6
+	email = me@asuto.dev
+	signingkey = C847103BF1781E76
 [core]
 	editor = nvim
 [sequence]
@@ -14,3 +14,5 @@
 	rebase = false
 [commit]
 	gpgsign = true
+[push]
+	default = current
