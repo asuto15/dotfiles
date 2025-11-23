@@ -65,3 +65,22 @@ hook_add = '''
   nmap * <Plug>(anzu-star)
   nmap # <Plug>(anzu-sharp)
 '''
+
+[[plugins]]
+repo = 'neovim/nvim-lspconfig'
+hook_add = '''
+  lua << EOF
+    require'lspconfig'.rust_analyzer.setup{
+      settings = {
+        ["rust-analyzer"] = {
+          cargo = { allFeatures = true },
+          procMacro = { enable = true },
+        }
+      }
+    }
+  EOF
+'''
+
+[[plugins]]
+repo = 'hrsh7th/nvim-cmp'
+

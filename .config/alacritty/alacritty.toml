@@ -58,15 +58,38 @@ action = "Paste"
 mods = "Shift"
 mouse = "Right"
 
+[cursor]
+style = { shape = "Beam", blinking = "On" }
+blink_interval = 500
+
 [keyboard]
 bindings = [
-{ key = "N", mods = "Command", action = "SelectNextTab" },
-{ key = "P", mods = "Command", action = "SelectPreviousTab" },
+{ key = "T", mods = "Command", action = "CreateNewTab" },
+{ key = "N", mods = "Command", action = "SpawnNewInstance" },
+{ key = "W", mods = "Command", action = "Quit" },
+{ key = "Tab", mods = "Control", action = "SelectNextTab" },
+{ key = "Tab", mods = "Control | Shift", action = "SelectPreviousTab" },
+{ key = "Left", mods = "Command", chars = "\u0001" },
+{ key = "Right", mods = "Command", chars = "\u0005" },
+{ key = "Home", chars = "\u0001" },
+{ key = "End", chars = "\u0005" },
+{ key = "V", mods = "Command | Shift", action = "ToggleViMode" },
 ]
+
+[bell]
+animation = "EaseoutExpo"
+duration = 0
+command = {program="osascript",args=["-e", "beep", "2"]}
 
 [window]
 opacity = 1.0
+option_as_alt = "Both"
+dynamic_padding = true
+decorations = "Full"
 
 [window.padding]
 x = 20
 y = 20
+
+[scrolling]
+history = 100000
