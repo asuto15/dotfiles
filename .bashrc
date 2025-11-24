@@ -8,7 +8,23 @@ case $- in
       *) return;;
 esac
 
-DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]:-$HOME/.bashrc}")" && pwd)}"
+resolve_dotfiles_dir() {
+    local src="${BASH_SOURCE[0]:-$HOME/.bashrc}"
+    if command -v realpath >/dev/null 2>&1; then
+        realpath "${src}"
+        return
+    fi
+    if command -v python3 >/dev/null 2>&1; then
+        python3 - <<'PY' "${src}"
+import os, sys
+print(os.path.realpath(sys.argv[1]))
+PY
+        return
+    fi
+    printf '%s\n' "${src}"
+}
+
+DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "$(resolve_dotfiles_dir)")" && pwd)}"
 [ -f "${DOTFILES_DIR}/shell/common_env.sh" ] && . "${DOTFILES_DIR}/shell/common_env.sh"
 
 # don't put duplicate lines or lines starting with space in the history.

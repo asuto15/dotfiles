@@ -21,6 +21,37 @@ install_pkg() {
   fi
 }
 
+install_starship() {
+  if command -v starship >/dev/null 2>&1; then
+    return
+  fi
+
+  # Prefer apt if the package is available.
+  if apt-cache show starship >/dev/null 2>&1; then
+    install_pkg "starship"
+    if command -v starship >/dev/null 2>&1; then
+      return
+    fi
+  fi
+
+  # Fallback to the official installer (non-interactive).
+  local downloader=()
+  if command -v curl >/dev/null 2>&1; then
+    downloader=(curl -fsSL https://starship.rs/install.sh)
+  elif command -v wget >/dev/null 2>&1; then
+    downloader=(wget -qO- https://starship.rs/install.sh)
+  else
+    echo "warn: cannot install starship (curl/wget missing)."
+    return
+  fi
+
+  mkdir -p "${HOME}/.local/bin"
+  echo "installing starship via official installer..."
+  if ! "${downloader[@]}" | sh -s -- -y -b "${HOME}/.local/bin"; then
+    echo "warn: starship installer failed."
+  fi
+}
+
 install_from_list() {
   local list_file="$1"
   [ -f "${list_file}" ] || return 0
@@ -28,6 +59,7 @@ install_from_list() {
   while IFS= read -r pkg; do
     case "${pkg}" in
       ""|\#*) continue ;;
+      starship) install_starship; continue ;;
     esac
     install_pkg "${pkg}"
   done < "${list_file}"
