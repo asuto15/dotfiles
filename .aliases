@@ -75,8 +75,8 @@ if [[ $(command -v rg) ]]; then
 fi
 
 # bat
-if [[ $(command -v bat) ]]; then
-  alias bat='bat --paging=never'
+if [[ $(command -v bat) || $(command -v batcat) ]]; then
+  alias bat='batcat --paging=never'
 fi
 
 # eza
