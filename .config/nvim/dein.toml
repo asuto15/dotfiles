@@ -68,6 +68,7 @@ hook_add = '''
 
 [[plugins]]
 repo = 'neovim/nvim-lspconfig'
+rev = 'v0.1.7'
 hook_add = '''
   lua << EOF
     require'lspconfig'.rust_analyzer.setup{
@@ -84,3 +85,8 @@ hook_add = '''
 [[plugins]]
 repo = 'hrsh7th/nvim-cmp'
 
+[[plugins]]
+repo = 'nvim-tree/nvim-web-devicons'
+
+[[plugins]]
+repo = 'nvim-tree/nvim-tree.lua'

@@ -6,6 +6,15 @@ set expandtab          "タブ入力を空白に変換
 set splitright         "画面を縦分割する際に右に開く
 set clipboard=unnamed  "yank した文字列をクリップボードにコピー
 set hls                "検索した文字をハイライトする
+"nvim-tree 用に標準の netrw を無効化
+let g:loaded_netrw = 1
+let g:loaded_netrwPlugin = 1
+"Neovim 0.9 環境向け: vim.loop が vim.uv に無い場合の互換対応
+lua << EOF
+  if vim.loop and not vim.uv then
+    vim.uv = vim.loop
+  end
+EOF
 
 let $CACHE = expand('~/.cache')
 if !isdirectory($CACHE)
@@ -40,3 +49,20 @@ endif
 filetype plugin indent on
 syntax enable
 
+" nvim-tree setup (fallbackでここで必ず実行)
+lua << EOF
+  if not vim.g.nvim_tree_setup_done then
+    local ok, tree = pcall(require, "nvim-tree")
+    if ok then
+      tree.setup({
+        view = { width = 35, preserve_window_proportions = true },
+        renderer = { group_empty = true, highlight_git = true },
+        update_focused_file = { enable = true },
+        actions = { open_file = { resize_window = true } },
+      })
+      vim.g.nvim_tree_setup_done = true
+    end
+  end
+EOF
+nnoremap <silent> <C-b> :NvimTreeToggle<CR>
+nnoremap <silent> <leader>e :NvimTreeFindFileToggle<CR>
