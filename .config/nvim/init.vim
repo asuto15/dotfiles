@@ -6,6 +6,7 @@ set expandtab          "タブ入力を空白に変換
 set splitright         "画面を縦分割する際に右に開く
 set clipboard=unnamed  "yank した文字列をクリップボードにコピー
 set hls                "検索した文字をハイライトする
+set noequalalways      "分割時に自動で高さを均等化しない
 "nvim-tree 用に標準の netrw を無効化
 let g:loaded_netrw = 1
 let g:loaded_netrwPlugin = 1
@@ -66,3 +67,13 @@ lua << EOF
 EOF
 nnoremap <silent> <C-b> :NvimTreeToggle<CR>
 nnoremap <silent> <leader>e :NvimTreeFindFileToggle<CR>
+" VSCode風レイアウト: 左にツリー、右上エディタ、右下ターミナル
+lua << EOF
+  vim.api.nvim_create_user_command("VscodeLayout", function()
+    vim.o.equalalways = false
+    vim.cmd("wincmd l")
+    vim.cmd("botright 12split | terminal")
+    vim.cmd("NvimTreeOpen")
+  end, {})
+EOF
+nnoremap <silent> <leader>vl :VscodeLayout<CR>
