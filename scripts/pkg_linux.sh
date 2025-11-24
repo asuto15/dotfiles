@@ -70,20 +70,33 @@ install_packages() {
   install_rustup
   install_cargo_tools
 
+  ensure_fd_linux
   # Ensure common aliases exist when Debian/Ubuntu package names differ.
   if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then
     mkdir -p "${HOME}/.local/bin"
     ln -sfn "$(command -v batcat)" "${HOME}/.local/bin/bat"
   fi
 
-  if command -v fdfind >/dev/null 2>&1 && ! command -v fd >/dev/null 2>&1; then
-    mkdir -p "${HOME}/.local/bin"
-    ln -sfn "$(command -v fdfind)" "${HOME}/.local/bin/fd"
-  fi
-
   if [ "${INSTALL_TAILSCALE:-0}" = "1" ]; then
     install_tailscale_linux
   fi
+}
+
+ensure_fd_linux() {
+  if command -v fd >/dev/null 2>&1; then
+    return
+  fi
+
+  install_pkg "fd-find"
+
+  # Provide fd alias for Debian/Ubuntu package name.
+  if command -v fdfind >/dev/null 2>&1; then
+    sudo mkdir -p /usr/local/bin
+    sudo ln -sfn "$(command -v fdfind)" /usr/local/bin/fd
+    return
+  fi
+
+  echo "warn: fd-find installation failed; fd not available."
 }
 
 install_tailscale_linux() {
