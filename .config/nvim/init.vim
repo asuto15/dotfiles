@@ -71,9 +71,9 @@ nnoremap <silent> <leader>e :NvimTreeFindFileToggle<CR>
 lua << EOF
   vim.api.nvim_create_user_command("VscodeLayout", function()
     vim.o.equalalways = false
+    vim.cmd("NvimTreeOpen")
     vim.cmd("wincmd l")
     vim.cmd("botright 12split | terminal")
-    vim.cmd("NvimTreeOpen")
   end, {})
 EOF
 nnoremap <silent> <leader>vl :VscodeLayout<CR>
