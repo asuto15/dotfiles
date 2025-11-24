@@ -79,4 +79,17 @@ install_packages() {
 
   install_rustup
   install_cargo_tools
+
+  if [ "${INSTALL_TAILSCALE:-0}" = "1" ]; then
+    install_tailscale_macos
+  fi
+}
+
+install_tailscale_macos() {
+  if command -v tailscale >/dev/null 2>&1; then
+    echo "tailscale already installed."
+    return
+  fi
+  echo "Installing tailscale via Homebrew..."
+  brew install tailscale
 }

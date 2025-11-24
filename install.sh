@@ -6,6 +6,9 @@ echo "Setting up dotfiles..."
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OS_NAME="$(uname -s)"
 
+# Optional feature flags
+INSTALL_TAILSCALE="${INSTALL_TAILSCALE:-0}"
+
 case "${OS_NAME}" in
   Darwin) PLATFORM="macos" ;;
   Linux)  PLATFORM="linux" ;;

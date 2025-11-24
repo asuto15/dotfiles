@@ -80,4 +80,24 @@ install_packages() {
     mkdir -p "${HOME}/.local/bin"
     ln -sfn "$(command -v fdfind)" "${HOME}/.local/bin/fd"
   fi
+
+  if [ "${INSTALL_TAILSCALE:-0}" = "1" ]; then
+    install_tailscale_linux
+  fi
+}
+
+install_tailscale_linux() {
+  if command -v tailscale >/dev/null 2>&1; then
+    echo "tailscale already installed."
+    return
+  fi
+
+  # Add Tailscale apt repo if missing
+  if [ ! -f /etc/apt/sources.list.d/tailscale.list ]; then
+    curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.gpg | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
+    curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.list | sudo tee /etc/apt/sources.list.d/tailscale.list >/dev/null
+    APT_UPDATED=0  # force apt update after adding repo
+  fi
+
+  install_pkg tailscale
 }
