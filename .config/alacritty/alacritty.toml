@@ -79,7 +79,7 @@ bindings = [
 [bell]
 animation = "EaseoutExpo"
 duration = 0
-command = {program="osascript",args=["-e", "beep", "2"]}
+command = { program = "sh", args = ["-c", "printf '\\a'"] }
 
 [window]
 opacity = 1.0
