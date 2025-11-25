@@ -59,6 +59,7 @@ install_from_list() {
   while IFS= read -r pkg; do
     case "${pkg}" in
       ""|\#*) continue ;;
+      eza) install_eza; continue ;;
       starship) install_starship; continue ;;
     esac
     install_pkg "${pkg}"
@@ -113,6 +114,31 @@ install_packages() {
   if [ "${INSTALL_TAILSCALE:-0}" = "1" ]; then
     install_tailscale_linux
   fi
+}
+
+install_eza() {
+  # Install via the official Debian/Ubuntu repo with a registered keyring.
+  if dpkg -s eza >/dev/null 2>&1; then
+    return
+  fi
+
+  local keyring="/etc/apt/keyrings/gierens.gpg"
+  local list_file="/etc/apt/sources.list.d/gierens.list"
+
+  if [ ! -f "${keyring}" ]; then
+    sudo mkdir -p /etc/apt/keyrings
+    curl -fsSL https://raw.githubusercontent.com/eza-community/eza/main/deb.asc \
+      | gpg --dearmor | sudo tee "${keyring}" >/dev/null
+  fi
+
+  if [ ! -f "${list_file}" ]; then
+    echo "deb [signed-by=${keyring}] http://deb.gierens.de stable main" \
+      | sudo tee "${list_file}" >/dev/null
+  fi
+
+  # Repo was just added; ensure apt update runs before install.
+  APT_UPDATED=0
+  install_pkg "eza"
 }
 
 ensure_fd_linux() {
