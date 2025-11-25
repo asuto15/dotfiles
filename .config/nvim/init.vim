@@ -66,6 +66,7 @@ lua << EOF
             tree_last_width = vim.api.nvim_win_get_width(vw)
           end
         end
+        vim.g.nvim_tree_last_width = tree_last_width
       end
       vim.api.nvim_create_autocmd("BufWinLeave", {
         pattern = "NvimTree_*",
@@ -111,21 +112,10 @@ lua << EOF
     end
   end
 EOF
-" VSCode風レイアウト: 左にツリー、右上エディタ、右下ターミナル
-lua << EOF
-  vim.api.nvim_create_user_command("VscodeLayout", function()
-    vim.o.equalalways = false
-    vim.cmd("NvimTreeOpen")
-    vim.cmd("wincmd l")
-    vim.cmd("botright 12split | terminal")
-  end, {})
-EOF
-nnoremap <silent> <leader>vl :VscodeLayout<CR>
-
 " nvim-tree 幅調整とターミナル制御
 lua << EOF
-  local term_bufid = nil
-  local term_last_height = 12
+  local term_bufid = vim.g._term_bufid
+  local term_last_height = vim.g._term_last_height or 12
 
   local function term_job_active(bufnr)
     if not (bufnr and vim.api.nvim_buf_is_valid(bufnr)) then
@@ -146,7 +136,9 @@ lua << EOF
       if vim.api.nvim_buf_get_option(buf, "buftype") == "terminal" then
         term_win = win
         term_last_height = vim.api.nvim_win_get_height(win)
+        vim.g._term_last_height = term_last_height
         term_bufid = buf
+        vim.g._term_bufid = term_bufid
         break
       end
     end
@@ -166,6 +158,8 @@ lua << EOF
       vim.cmd("terminal")
       term_bufid = vim.api.nvim_get_current_buf()
     end
+    vim.g._term_bufid = term_bufid
+    vim.g._term_last_height = vim.api.nvim_win_get_height(win)
   end
 
   local function resize_width_current(delta)
@@ -185,6 +179,7 @@ lua << EOF
     local buf = vim.api.nvim_get_current_buf()
     if vim.api.nvim_buf_get_option(buf, "buftype") == "terminal" then
       term_last_height = vim.api.nvim_win_get_height(0)
+      vim.g._term_last_height = term_last_height
     end
   end
 
@@ -195,6 +190,87 @@ lua << EOF
   vim.keymap.set("n", "<leader>+", function() resize_height_current(2) end, { silent = true })
   vim.keymap.set("n", "<leader>-", function() resize_height_current(-2) end, { silent = true })
 EOF
+
+" VSCode風レイアウト: 左にツリー、右上エディタ、右下ターミナル（冪等）
+lua << EOF
+  local function job_active(bufnr)
+    if not (bufnr and vim.api.nvim_buf_is_valid(bufnr)) then return false end
+    local ok, job = pcall(vim.api.nvim_buf_get_var, bufnr, "terminal_job_id")
+    if not ok or job <= 0 then return false end
+    return vim.fn.jobwait({ job }, 0)[1] == -1
+  end
+
+  local function ensure_tree()
+    local view = require("nvim-tree.view")
+    if not view.is_visible() then
+      vim.cmd("NvimTreeOpen")
+    end
+    local win = view.get_winnr()
+    if win and vim.api.nvim_win_is_valid(win) then
+      local width = vim.g.nvim_tree_last_width or 35
+      vim.api.nvim_win_set_width(win, width)
+    end
+  end
+
+  local function ensure_editor_window()
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+      local buf = vim.api.nvim_win_get_buf(win)
+      local ft = vim.api.nvim_buf_get_option(buf, "filetype")
+      if ft ~= "NvimTree" then
+        return win
+      end
+    end
+    vim.cmd("vsplit")
+    return vim.api.nvim_get_current_win()
+  end
+
+  local function ensure_terminal_bottom()
+    local term_win = nil
+    local term_buf = nil
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+      local buf = vim.api.nvim_win_get_buf(win)
+      if vim.api.nvim_buf_get_option(buf, "buftype") == "terminal" then
+        term_win = win
+        term_buf = buf
+        break
+      end
+    end
+    if term_win then
+      vim.api.nvim_set_current_win(term_win)
+      vim.cmd("wincmd J")
+      local h = vim.g._term_last_height or 12
+      if h > 0 then vim.api.nvim_win_set_height(term_win, h) end
+      return
+    end
+
+    local reuse = nil
+    if job_active(vim.g._term_bufid) then
+      reuse = vim.g._term_bufid
+    end
+    vim.o.equalalways = false
+    vim.cmd("botright 12split")
+    local win = vim.api.nvim_get_current_win()
+    local h = vim.g._term_last_height or 12
+    if h > 0 then vim.api.nvim_win_set_height(win, h) end
+    if reuse then
+      vim.api.nvim_win_set_buf(win, reuse)
+    else
+      vim.cmd("terminal")
+      reuse = vim.api.nvim_get_current_buf()
+    end
+    vim.g._term_bufid = reuse
+    vim.g._term_last_height = vim.api.nvim_win_get_height(win)
+  end
+
+  vim.api.nvim_create_user_command("VscodeLayout", function()
+    vim.o.equalalways = false
+    ensure_tree()
+    local editor_win = ensure_editor_window()
+    vim.api.nvim_set_current_win(editor_win)
+    ensure_terminal_bottom()
+  end, {})
+EOF
+nnoremap <silent> <leader>vl :VscodeLayout<CR>
 
 " カラースキーム適用後に背景を透明に上書き
 function! s:set_transparent()
