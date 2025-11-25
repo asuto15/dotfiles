@@ -77,3 +77,58 @@ lua << EOF
   end, {})
 EOF
 nnoremap <silent> <leader>vl :VscodeLayout<CR>
+
+" nvim-tree 幅調整とターミナル制御
+lua << EOF
+  local function toggle_bottom_term()
+    local term_win
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+      local buf = vim.api.nvim_win_get_buf(win)
+      if vim.api.nvim_buf_get_option(buf, "buftype") == "terminal" then
+        term_win = win
+        break
+      end
+    end
+    if term_win then
+      vim.api.nvim_win_close(term_win, true)
+      return
+    end
+    vim.o.equalalways = false
+    vim.cmd("botright 12split | terminal")
+  end
+
+  local function resize_width_current(delta)
+    if delta >= 0 then
+      vim.cmd("vertical resize +" .. delta)
+    else
+      vim.cmd("vertical resize " .. delta)
+    end
+  end
+
+  local function resize_height_current(delta)
+    if delta >= 0 then
+      vim.cmd("resize +" .. delta)
+    else
+      vim.cmd("resize " .. delta)
+    end
+  end
+
+  vim.keymap.set("n", "<leader>]", function() resize_width_current(5) end, { silent = true })
+  vim.keymap.set("n", "<leader>[", function() resize_width_current(-5) end, { silent = true })
+  vim.keymap.set("n", "<leader>t", toggle_bottom_term, { silent = true })
+  vim.keymap.set("n", "<leader>+", function() resize_height_current(2) end, { silent = true })
+  vim.keymap.set("n", "<leader>-", function() resize_height_current(-2) end, { silent = true })
+EOF
+
+" カラースキーム適用後に背景を透明に上書き
+function! s:set_transparent()
+  highlight Normal guibg=none ctermbg=none
+  highlight NormalNC guibg=none ctermbg=none
+  highlight EndOfBuffer guibg=none ctermbg=none
+  highlight SignColumn guibg=none ctermbg=none
+endfunction
+augroup TransparentBG
+  autocmd!
+  autocmd ColorScheme * call s:set_transparent()
+  autocmd VimEnter * call s:set_transparent()
+augroup END

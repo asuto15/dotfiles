@@ -5,7 +5,7 @@ repo = 'Shougo/dein.vim'
 repo = 'tpope/vim-endwise'
 
 [[plugins]]
-repo = 'Townk/vim-autoclode'
+repo = 'Townk/vim-autoclose'
 
 [[plugins]]
 repo = 'joshdick/onedark.vim'
@@ -31,9 +31,9 @@ hook_add = '''
 [[plugins]]
 repo = 'tpope/vim-fugitive'
 hook_add = '''
-  command Gst :Gstatus
-  command Gdf :Gdiff
-  command Gbl :Gblame
+command! Gst Gstatus
+command! Gdf Gdiff
+command! Gbl Gblame
 '''
 
 [[plugins]]
@@ -70,16 +70,16 @@ hook_add = '''
 repo = 'neovim/nvim-lspconfig'
 rev = 'v0.1.7'
 hook_add = '''
-  lua << EOF
-    require'lspconfig'.rust_analyzer.setup{
-      settings = {
-        ["rust-analyzer"] = {
-          cargo = { allFeatures = true },
-          procMacro = { enable = true },
-        }
-      }
+lua << EOF
+require'lspconfig'.rust_analyzer.setup{
+  settings = {
+    ["rust-analyzer"] = {
+      cargo = { allFeatures = true },
+      procMacro = { enable = true },
     }
-  EOF
+  }
+}
+EOF
 '''
 
 [[plugins]]
