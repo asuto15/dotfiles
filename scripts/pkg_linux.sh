@@ -59,10 +59,10 @@ install_from_list() {
   while IFS= read -r pkg; do
     case "${pkg}" in
       ""|\#*) continue ;;
-      eza) install_eza; continue ;;
-      starship) install_starship; continue ;;
+      eza) install_eza ;;
+      starship) install_starship ;;
+      *) install_pkg "${pkg}" ;;
     esac
-    install_pkg "${pkg}"
   done < "${list_file}"
 }
 
