@@ -67,10 +67,19 @@ install_from_list() {
 }
 
 install_neovim() {
-  if command -v nvim >/dev/null 2>&1; then
+  if neovim_is_modern; then
     return
   fi
-  install_pkg "neovim"
+
+  if is_ubuntu; then
+    ensure_neovim_ppa
+    install_pkg "neovim"
+    if neovim_is_modern; then
+      return
+    fi
+  fi
+
+  install_neovim_release_tarball
 }
 
 install_rustup() {
@@ -114,6 +123,63 @@ install_packages() {
   if [ "${INSTALL_TAILSCALE:-0}" = "1" ]; then
     install_tailscale_linux
   fi
+}
+
+neovim_is_modern() {
+  if ! command -v nvim >/dev/null 2>&1; then
+    return 1
+  fi
+  local ver
+  ver="$(nvim --version | head -n1 | awk '{print $2}' | sed 's/^v//')"
+  if dpkg --compare-versions "${ver}" ge "0.11.0"; then
+    return 0
+  fi
+  return 1
+}
+
+is_ubuntu() {
+  if [ -r /etc/os-release ]; then
+    . /etc/os-release
+    [ "${ID:-}" = "ubuntu" ] && return 0
+  fi
+  return 1
+}
+
+ensure_neovim_ppa() {
+  if [ -f /etc/apt/sources.list.d/neovim-ppa-ubuntu-stable.list ]; then
+    return
+  fi
+
+  install_pkg "software-properties-common"
+  sudo add-apt-repository -y ppa:neovim-ppa/stable
+  APT_UPDATED=0  # force apt update after adding repo
+}
+
+install_neovim_release_tarball() {
+  local tmp_dir url tag
+  tmp_dir="$(mktemp -d /tmp/nvim.XXXXXX)"
+
+  # Resolve the latest tag to avoid redirect flakiness.
+  tag="$(curl -fsSL https://api.github.com/repos/neovim/neovim/releases/latest 2>/dev/null \
+    | awk -F '\"' '/tag_name/ {print $4; exit}')"
+  if [ -n "${tag}" ]; then
+    url="https://github.com/neovim/neovim/releases/download/${tag}/nvim-linux-x86_64.tar.gz"
+  else
+    url="https://github.com/neovim/neovim/releases/latest/download/nvim-linux-x86_64.tar.gz"
+  fi
+
+  echo "installing latest Neovim release from ${url}..."
+  if ! curl -fL --retry 3 --retry-delay 1 -o "${tmp_dir}/nvim.tar.gz" "${url}"; then
+    echo "warn: failed to download Neovim release tarball."
+    rm -rf "${tmp_dir}"
+    return
+  fi
+
+  # Extract to /usr/local and symlink nvim.
+  sudo tar -C /usr/local -xzf "${tmp_dir}/nvim.tar.gz"
+  sudo ln -sfn /usr/local/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
+
+  rm -rf "${tmp_dir}"
 }
 
 install_eza() {
