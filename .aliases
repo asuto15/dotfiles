@@ -21,6 +21,12 @@ if [[ $(command -v brew) ]]; then
   alias brewup='brew update && brew upgrade && brew cleanup'
 fi
 
+# pbcopy/pbpaste via xsel (Linux)
+if [[ $(command -v xsel) ]]; then
+  alias pbcopy='xsel --clipboard --input'
+  alias pbpaste='xsel --clipboard --output'
+fi
+
 # tmux
 if [[ $(command -v tmux) ]]; then
   alias tmux='tmux -2'

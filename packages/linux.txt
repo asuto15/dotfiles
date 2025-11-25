@@ -2,3 +2,4 @@
 build-essential
 fd-find
 starship
+xsel
