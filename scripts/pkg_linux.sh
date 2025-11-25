@@ -190,20 +190,26 @@ install_eza() {
 
   local keyring="/etc/apt/keyrings/gierens.gpg"
   local list_file="/etc/apt/sources.list.d/gierens.list"
-  local arch
+  local arch tmp_key
   arch="$(dpkg --print-architecture)"
 
-  if [ ! -f "${keyring}" ]; then
-    sudo install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://raw.githubusercontent.com/eza-community/eza/main/deb.asc \
-      | sudo gpg --dearmor -o "${keyring}"
-    sudo chmod a+r "${keyring}"
-  fi
+  # Ensure prerequisites for fetching keys exist.
+  install_pkg "ca-certificates"
+  install_pkg "curl"
+  install_pkg "gnupg"
 
-  if [ ! -f "${list_file}" ]; then
-    echo "deb [arch=${arch} signed-by=${keyring}] http://deb.gierens.de stable main" \
-      | sudo tee "${list_file}" >/dev/null
+  sudo install -m 0755 -d /etc/apt/keyrings
+  tmp_key="$(mktemp)"
+  if curl -fsSL https://raw.githubusercontent.com/eza-community/eza/main/deb.asc -o "${tmp_key}"; then
+    sudo gpg --dearmor -o "${keyring}" "${tmp_key}"
+    sudo chmod a+r "${keyring}"
+  else
+    echo "warn: failed to download eza repo key."
   fi
+  rm -f "${tmp_key}"
+
+  echo "deb [arch=${arch} signed-by=${keyring}] http://deb.gierens.de stable main" \
+    | sudo tee "${list_file}" >/dev/null
 
   # Repo was just added; ensure apt update runs before install.
   APT_UPDATED=0
