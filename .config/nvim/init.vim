@@ -55,6 +55,36 @@ lua << EOF
   if not vim.g.nvim_tree_setup_done then
     local ok, tree = pcall(require, "nvim-tree")
     if ok then
+      local tree_last_width = 35
+      local function store_tree_width(win)
+        if win and vim.api.nvim_win_is_valid(win) then
+          tree_last_width = vim.api.nvim_win_get_width(win)
+        else
+          local view = require("nvim-tree.view")
+          local vw = view.get_winnr()
+          if vw and vim.api.nvim_win_is_valid(vw) then
+            tree_last_width = vim.api.nvim_win_get_width(vw)
+          end
+        end
+      end
+      vim.api.nvim_create_autocmd("BufWinLeave", {
+        pattern = "NvimTree_*",
+        callback = function(ev) store_tree_width(ev.win) end,
+      })
+      local function toggle_tree_restore()
+        local view = require("nvim-tree.view")
+        if view.is_visible() then
+          store_tree_width(view.get_winnr())
+          vim.cmd("NvimTreeToggle")
+        else
+          vim.cmd("NvimTreeToggle")
+          local win = view.get_winnr()
+          if win and vim.api.nvim_win_is_valid(win) then
+            vim.api.nvim_win_set_width(win, tree_last_width)
+          end
+        end
+      end
+
       local function on_attach(bufnr)
         local api = require("nvim-tree.api")
         api.config.mappings.default_on_attach(bufnr)
@@ -69,11 +99,18 @@ lua << EOF
         actions = { open_file = { resize_window = true } },
       })
       vim.g.nvim_tree_setup_done = true
+      vim.keymap.set("n", "<C-b>", toggle_tree_restore, { silent = true })
+      vim.keymap.set("n", "<leader>e", function()
+        require("nvim-tree.api").tree.find_file({ open = true, focus = true })
+        local view = require("nvim-tree.view")
+        local win = view.get_winnr()
+        if win and vim.api.nvim_win_is_valid(win) then
+          vim.api.nvim_win_set_width(win, tree_last_width)
+        end
+      end, { silent = true })
     end
   end
 EOF
-nnoremap <silent> <C-b> :NvimTreeToggle<CR>
-nnoremap <silent> <leader>e :NvimTreeFindFileToggle<CR>
 " VSCode風レイアウト: 左にツリー、右上エディタ、右下ターミナル
 lua << EOF
   vim.api.nvim_create_user_command("VscodeLayout", function()
@@ -88,6 +125,7 @@ nnoremap <silent> <leader>vl :VscodeLayout<CR>
 " nvim-tree 幅調整とターミナル制御
 lua << EOF
   local term_bufid = nil
+  local term_last_height = 12
 
   local function term_job_active(bufnr)
     if not (bufnr and vim.api.nvim_buf_is_valid(bufnr)) then
@@ -107,6 +145,7 @@ lua << EOF
       local buf = vim.api.nvim_win_get_buf(win)
       if vim.api.nvim_buf_get_option(buf, "buftype") == "terminal" then
         term_win = win
+        term_last_height = vim.api.nvim_win_get_height(win)
         term_bufid = buf
         break
       end
@@ -118,6 +157,9 @@ lua << EOF
     vim.o.equalalways = false
     vim.cmd("botright 12split")
     local win = vim.api.nvim_get_current_win()
+    if term_last_height and term_last_height > 0 then
+      vim.api.nvim_win_set_height(win, term_last_height)
+    end
     if term_job_active(term_bufid) then
       vim.api.nvim_win_set_buf(win, term_bufid)
     else
@@ -139,6 +181,10 @@ lua << EOF
       vim.cmd("resize +" .. delta)
     else
       vim.cmd("resize " .. delta)
+    end
+    local buf = vim.api.nvim_get_current_buf()
+    if vim.api.nvim_buf_get_option(buf, "buftype") == "terminal" then
+      term_last_height = vim.api.nvim_win_get_height(0)
     end
   end
 
