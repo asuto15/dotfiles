@@ -55,7 +55,14 @@ lua << EOF
   if not vim.g.nvim_tree_setup_done then
     local ok, tree = pcall(require, "nvim-tree")
     if ok then
+      local function on_attach(bufnr)
+        local api = require("nvim-tree.api")
+        api.config.mappings.default_on_attach(bufnr)
+        -- allow global <C-t> to reach terminal toggle
+        pcall(vim.keymap.del, "n", "<C-t>", { buffer = bufnr })
+      end
       tree.setup({
+        on_attach = on_attach,
         view = { width = 35, preserve_window_proportions = true },
         renderer = { group_empty = true, highlight_git = true },
         update_focused_file = { enable = true },
@@ -80,12 +87,27 @@ nnoremap <silent> <leader>vl :VscodeLayout<CR>
 
 " nvim-tree 幅調整とターミナル制御
 lua << EOF
+  local term_bufid = nil
+
+  local function term_job_active(bufnr)
+    if not (bufnr and vim.api.nvim_buf_is_valid(bufnr)) then
+      return false
+    end
+    local ok, job_id = pcall(vim.api.nvim_buf_get_var, bufnr, "terminal_job_id")
+    if not ok or job_id <= 0 then
+      return false
+    end
+    local status = vim.fn.jobwait({ job_id }, 0)[1]
+    return status == -1
+  end
+
   local function toggle_bottom_term()
     local term_win
     for _, win in ipairs(vim.api.nvim_list_wins()) do
       local buf = vim.api.nvim_win_get_buf(win)
       if vim.api.nvim_buf_get_option(buf, "buftype") == "terminal" then
         term_win = win
+        term_bufid = buf
         break
       end
     end
@@ -94,7 +116,14 @@ lua << EOF
       return
     end
     vim.o.equalalways = false
-    vim.cmd("botright 12split | terminal")
+    vim.cmd("botright 12split")
+    local win = vim.api.nvim_get_current_win()
+    if term_job_active(term_bufid) then
+      vim.api.nvim_win_set_buf(win, term_bufid)
+    else
+      vim.cmd("terminal")
+      term_bufid = vim.api.nvim_get_current_buf()
+    end
   end
 
   local function resize_width_current(delta)
@@ -116,6 +145,7 @@ lua << EOF
   vim.keymap.set("n", "<leader>]", function() resize_width_current(5) end, { silent = true })
   vim.keymap.set("n", "<leader>[", function() resize_width_current(-5) end, { silent = true })
   vim.keymap.set("n", "<leader>t", toggle_bottom_term, { silent = true })
+  vim.keymap.set("n", "<C-t>", toggle_bottom_term, { silent = true })
   vim.keymap.set("n", "<leader>+", function() resize_height_current(2) end, { silent = true })
   vim.keymap.set("n", "<leader>-", function() resize_height_current(-2) end, { silent = true })
 EOF
