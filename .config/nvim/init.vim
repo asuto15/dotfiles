@@ -96,6 +96,8 @@ lua << EOF
         on_attach = on_attach,
         view = { width = 35, preserve_window_proportions = true },
         renderer = { group_empty = true, highlight_git = true },
+        git = { ignore = false },
+        filters = { git_ignored = false, dotfiles = false },
         update_focused_file = { enable = true },
         actions = { open_file = { resize_window = true } },
       })

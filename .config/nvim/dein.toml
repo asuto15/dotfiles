@@ -68,17 +68,26 @@ hook_add = '''
 
 [[plugins]]
 repo = 'neovim/nvim-lspconfig'
-rev = 'v0.1.7'
 hook_add = '''
 lua << EOF
-require'lspconfig'.rust_analyzer.setup{
-  settings = {
-    ["rust-analyzer"] = {
-      cargo = { allFeatures = true },
-      procMacro = { enable = true },
-    }
-  }
+local rust_analyzer_settings = {
+  ["rust-analyzer"] = {
+    cargo = { allFeatures = true },
+    procMacro = { enable = true },
+  },
 }
+
+if vim.fn.has("nvim-0.11") == 1 and vim.lsp and vim.lsp.config and vim.lsp.enable then
+  -- Neovim 0.11+ recommended path: define config then enable it
+  vim.lsp.config("rust_analyzer", { settings = rust_analyzer_settings })
+  vim.lsp.enable("rust_analyzer")
+else
+  -- Fallback for older versions using the legacy lspconfig setup
+  local ok, lspconfig = pcall(require, "lspconfig")
+  if ok and lspconfig.rust_analyzer then
+    lspconfig.rust_analyzer.setup({ settings = rust_analyzer_settings })
+  end
+end
 EOF
 '''
 
