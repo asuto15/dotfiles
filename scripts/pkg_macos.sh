@@ -79,6 +79,7 @@ install_packages() {
 
   install_rustup
   install_cargo_tools
+  install_rust_projects
 
   if [ "${INSTALL_TAILSCALE:-0}" = "1" ]; then
     install_tailscale_macos

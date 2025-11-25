@@ -101,6 +101,7 @@ install_packages() {
   install_neovim
   install_rustup
   install_cargo_tools
+  install_rust_projects
 
   ensure_fd_linux
   # Ensure common aliases exist when Debian/Ubuntu package names differ.
