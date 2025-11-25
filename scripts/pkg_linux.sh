@@ -2,7 +2,7 @@
 set -euo pipefail
 
 apt_update_once() {
-  if [ -z "${APT_UPDATED:-}" ]; then
+  if [ -z "${APT_UPDATED:-}" ] || [ "${APT_UPDATED:-}" = "0" ]; then
     echo "Updating apt repositories..."
     sudo apt-get update -qq
     APT_UPDATED=1
@@ -190,15 +190,18 @@ install_eza() {
 
   local keyring="/etc/apt/keyrings/gierens.gpg"
   local list_file="/etc/apt/sources.list.d/gierens.list"
+  local arch
+  arch="$(dpkg --print-architecture)"
 
   if [ ! -f "${keyring}" ]; then
-    sudo mkdir -p /etc/apt/keyrings
+    sudo install -m 0755 -d /etc/apt/keyrings
     curl -fsSL https://raw.githubusercontent.com/eza-community/eza/main/deb.asc \
-      | gpg --dearmor | sudo tee "${keyring}" >/dev/null
+      | sudo gpg --dearmor -o "${keyring}"
+    sudo chmod a+r "${keyring}"
   fi
 
   if [ ! -f "${list_file}" ]; then
-    echo "deb [signed-by=${keyring}] http://deb.gierens.de stable main" \
+    echo "deb [arch=${arch} signed-by=${keyring}] http://deb.gierens.de stable main" \
       | sudo tee "${list_file}" >/dev/null
   fi
 
