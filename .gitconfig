@@ -1,7 +1,6 @@
 [user]
 	name = asuto15
 	email = me@asuto.dev
-	signingkey = C847103BF1781E76
 [core]
 	editor = nvim
 [sequence]
