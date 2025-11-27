@@ -21,8 +21,11 @@ if [[ $(command -v brew) ]]; then
   alias brewup='brew update && brew upgrade && brew cleanup'
 fi
 
-# pbcopy/pbpaste via xsel (Linux)
-if [[ $(command -v xsel) ]]; then
+# pbcopy/pbpaste (prefer Wayland wl-clip, fallback to xsel)
+if [[ $(command -v wl-copy) && $(command -v wl-paste) ]]; then
+  alias pbcopy='wl-copy'
+  alias pbpaste='wl-paste'
+elif [[ $(command -v xsel) ]]; then
   alias pbcopy='xsel --clipboard --input'
   alias pbpaste='xsel --clipboard --output'
 fi
@@ -81,7 +84,9 @@ if [[ $(command -v rg) ]]; then
 fi
 
 # bat
-if [[ $(command -v bat) || $(command -v batcat) ]]; then
+if [[ $(command -v bat) ]]; then
+  alias bat='bat --paging=never'
+elif [[ $(command -v batcat) ]]; then
   alias bat='batcat --paging=never'
 fi
 
