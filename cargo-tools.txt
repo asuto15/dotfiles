@@ -1,9 +1,15 @@
 bootimage
+cargo-xbuild
 cargo-audit
+cargo-deny
 cargo-edit
-cargo-generate
+cargo-nextest
 cargo-outdated
+cargo-expand
+cargo-chef
 cargo-watch
+bacon
 mdbook
 wasm-bindgen-cli
 wasm-pack
+trunk
