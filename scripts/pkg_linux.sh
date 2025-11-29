@@ -66,6 +66,130 @@ install_from_list() {
   done < "${list_file}"
 }
 
+prompt_yes_no() {
+  local prompt default answer
+  prompt="$1"
+  default="$2" # y or n
+
+  if [ ! -t 0 ]; then
+    [ "${default}" = "y" ] && return 0 || return 1
+  fi
+
+  local hint="[y/n]"
+  [ "${default}" = "y" ] && hint="[Y/n]"
+  [ "${default}" = "n" ] && hint="[y/N]"
+
+  while :; do
+    read -rp "${prompt} ${hint} " answer
+    answer="${answer:-${default}}"
+    case "${answer}" in
+      y|Y) return 0 ;;
+      n|N) return 1 ;;
+      *) echo "Please answer y or n." ;;
+    esac
+  done
+}
+
+select_linux_profile() {
+  # Allow non-interactive override
+  case "${LINUX_PROFILE:-}" in
+    client|server|none) return ;;
+  esac
+
+  # Default to client when not attached to a TTY
+  if [ ! -t 0 ]; then
+    LINUX_PROFILE="client"
+    return
+  fi
+
+  echo "Select Linux profile:"
+  echo "  1) client (desktop/tools)"
+  echo "  2) server (minimal)"
+  echo "  3) none   (base only)"
+  while :; do
+    read -rp "Enter choice [1-3, default=1]: " choice
+    case "${choice:-1}" in
+      1) LINUX_PROFILE="client"; break ;;
+      2) LINUX_PROFILE="server"; break ;;
+      3) LINUX_PROFILE="none"; break ;;
+      *) echo "Invalid choice: ${choice}" ;;
+    esac
+  done
+  echo "Profile: ${LINUX_PROFILE}"
+}
+
+select_optional_tools() {
+  # Defaults per profile
+  local default_node_stack="n"
+  local default_uv="n"
+  local default_vscode="n"
+  local default_alacritty="n"
+  local default_cursor="n"
+
+  case "${LINUX_PROFILE:-client}" in
+    client)
+      default_node_stack="y"
+      default_uv="y"
+      default_vscode="y"
+      default_alacritty="y"
+      default_cursor="n"
+      ;;
+    server)
+      default_node_stack="n"
+      default_uv="n"
+      default_vscode="n"
+      default_alacritty="n"
+      default_cursor="n"
+      ;;
+    none)
+      default_node_stack="n"
+      default_uv="n"
+      default_vscode="n"
+      default_alacritty="n"
+      default_cursor="n"
+      ;;
+  esac
+
+  # Environment overrides
+  if [ -n "${INSTALL_NODE_STACK:-}" ]; then
+    default_node_stack=$([ "${INSTALL_NODE_STACK}" = "1" ] && echo "y" || echo "n")
+  fi
+  if [ -n "${INSTALL_UV:-}" ]; then
+    default_uv=$([ "${INSTALL_UV}" = "1" ] && echo "y" || echo "n")
+  fi
+  if [ -n "${INSTALL_VSCODE:-}" ]; then
+    default_vscode=$([ "${INSTALL_VSCODE}" = "1" ] && echo "y" || echo "n")
+  fi
+  if [ -n "${INSTALL_ALACRITTY:-}" ]; then
+    default_alacritty=$([ "${INSTALL_ALACRITTY}" = "1" ] && echo "y" || echo "n")
+  fi
+  if [ -n "${INSTALL_CURSOR:-}" ]; then
+    default_cursor=$([ "${INSTALL_CURSOR}" = "1" ] && echo "y" || echo "n")
+  fi
+
+  INSTALL_NODE_STACK="0"
+  INSTALL_UV="0"
+  INSTALL_VSCODE="0"
+  INSTALL_ALACRITTY="0"
+  INSTALL_CURSOR="0"
+
+  if prompt_yes_no "Install Node.js/npm/yarn/pnpm?" "${default_node_stack}"; then
+    INSTALL_NODE_STACK="1"
+  fi
+  if prompt_yes_no "Install uv (Python package manager)?" "${default_uv}"; then
+    INSTALL_UV="1"
+  fi
+  if prompt_yes_no "Install VSCode (official repository)?" "${default_vscode}"; then
+    INSTALL_VSCODE="1"
+  fi
+  if prompt_yes_no "Install Alacritty (apt/cargo)?" "${default_alacritty}"; then
+    INSTALL_ALACRITTY="1"
+  fi
+  if prompt_yes_no "Install Cursor (official repository)?" "${default_cursor}"; then
+    INSTALL_CURSOR="1"
+  fi
+}
+
 install_neovim() {
   if neovim_is_modern; then
     return
@@ -90,6 +214,91 @@ install_rustup() {
     | sh -s -- -y --no-modify-path --default-toolchain stable
 }
 
+install_node_stack() {
+  install_pkg "nodejs"
+  install_pkg "npm"
+  if command -v npm >/dev/null 2>&1; then
+    echo "npm install -g yarn pnpm"
+    npm install -g yarn pnpm || echo "warn: npm global install (yarn/pnpm) failed."
+  else
+    echo "warn: npm not available; skipping yarn/pnpm install."
+  fi
+}
+
+install_uv() {
+  if command -v uv >/dev/null 2>&1; then
+    return
+  fi
+  local downloader=()
+  if command -v curl >/dev/null 2>&1; then
+    downloader=(curl -fsSL https://astral.sh/uv/install.sh)
+  elif command -v wget >/dev/null 2>&1; then
+    downloader=(wget -qO- https://astral.sh/uv/install.sh)
+  else
+    echo "warn: cannot install uv (curl/wget missing)."
+    return
+  fi
+  echo "installing uv..."
+  if ! "${downloader[@]}" | sh; then
+    echo "warn: uv installer failed."
+  fi
+}
+
+install_vscode_official() {
+  if command -v code >/dev/null 2>&1; then
+    return
+  fi
+  install_pkg "wget"
+  install_pkg "gpg"
+  local keyring="/usr/share/keyrings/microsoft.gpg"
+  local list_file="/etc/apt/sources.list.d/vscode.list"
+  if [ ! -f "${keyring}" ]; then
+    echo "adding Microsoft GPG key..."
+    wget -qO- https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o "${keyring}"
+  fi
+  if [ ! -f "${list_file}" ]; then
+    echo "adding VSCode apt repo..."
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=${keyring}] https://packages.microsoft.com/repos/code stable main" \
+      | sudo tee "${list_file}" >/dev/null
+    APT_UPDATED=0
+  fi
+  install_pkg "apt-transport-https"
+  install_pkg "code"
+}
+
+install_cursor_official() {
+  if command -v cursor >/dev/null 2>&1; then
+    return
+  fi
+  install_pkg "wget"
+  install_pkg "gpg"
+  local keyring="/etc/apt/keyrings/cursor-archive-keyring.gpg"
+  local list_file="/etc/apt/sources.list.d/cursor.list"
+  sudo mkdir -p /etc/apt/keyrings
+  if [ ! -f "${keyring}" ]; then
+    echo "adding Cursor GPG key..."
+    wget -qO- https://dl.cursor.sh/apt/pubkey.gpg | sudo gpg --dearmor -o "${keyring}"
+  fi
+  if [ ! -f "${list_file}" ]; then
+    echo "adding Cursor apt repo..."
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=${keyring}] https://dl.cursor.sh/apt stable main" \
+      | sudo tee "${list_file}" >/dev/null
+    APT_UPDATED=0
+  fi
+  install_pkg "cursor"
+}
+
+install_alacritty() {
+  if command -v alacritty >/dev/null 2>&1; then
+    return
+  fi
+  if apt-cache show alacritty >/dev/null 2>&1; then
+    install_pkg "alacritty"
+    return
+  fi
+  echo "warn: alacritty package not available via apt-cache; install manually if needed."
+}
+
 install_cargo_tools() {
   local list_file="${DOTFILES_DIR}/cargo-tools.txt"
   [ -f "${list_file}" ] || return 0
@@ -107,6 +316,30 @@ install_cargo_tools() {
 install_packages() {
   install_from_list "${DOTFILES_DIR}/packages/common.txt"
   install_from_list "${DOTFILES_DIR}/packages/linux.txt"
+  select_linux_profile
+  select_optional_tools
+  case "${LINUX_PROFILE:-client}" in
+    client) install_from_list "${DOTFILES_DIR}/packages/linux_client.txt" ;;
+    server) install_from_list "${DOTFILES_DIR}/packages/linux_server.txt" ;;
+    none) ;; # base only
+    *) echo "warn: unknown LINUX_PROFILE=${LINUX_PROFILE}, skipping profile packages" ;;
+  esac
+
+  if [ "${INSTALL_NODE_STACK}" = "1" ]; then
+    install_node_stack
+  fi
+  if [ "${INSTALL_UV}" = "1" ]; then
+    install_uv
+  fi
+  if [ "${INSTALL_VSCODE}" = "1" ]; then
+    install_vscode_official
+  fi
+  if [ "${INSTALL_ALACRITTY}" = "1" ]; then
+    install_alacritty
+  fi
+  if [ "${INSTALL_CURSOR}" = "1" ]; then
+    install_cursor_official
+  fi
 
   install_neovim
   install_rustup

@@ -26,6 +26,7 @@ PY
 
 DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "$(resolve_dotfiles_dir)")" && pwd)}"
 [ -f "${DOTFILES_DIR}/shell/common_env.sh" ] && . "${DOTFILES_DIR}/shell/common_env.sh"
+[ -f "${DOTFILES_DIR}/shell/local_env.sh" ] && . "${DOTFILES_DIR}/shell/local_env.sh"
 
 # don't put duplicate lines or lines starting with space in the history.
 # See bash(1) for more options

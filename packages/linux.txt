@@ -1,5 +1,3 @@
 # Linux specific extras
 build-essential
 fd-find
-starship
-xsel

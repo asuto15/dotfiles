@@ -1,0 +1,3 @@
+# Linux desktop/client extras
+starship
+xsel

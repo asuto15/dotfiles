@@ -1,0 +1,2 @@
+# Linux server extras
+# Add server-only packages here (e.g., fail2ban, ufw, etc.)
