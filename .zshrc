@@ -5,6 +5,9 @@ DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "${(%):-%N}")" && pwd)}"
 [ -f "${DOTFILES_DIR}/shell/common_env.sh" ] && source "${DOTFILES_DIR}/shell/common_env.sh"
 [ -f "${DOTFILES_DIR}/shell/local_env.sh" ] && source "${DOTFILES_DIR}/shell/local_env.sh"
 
+# GPG pinentry in interactive shells
+export GPG_TTY="$(tty)"
+
 _ssh_hosts() {
   setopt localoptions nullglob
   local -a compHosts files
