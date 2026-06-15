@@ -82,7 +82,7 @@ duration = 0
 command = { program = "sh", args = ["-c", "printf '\\a'"] }
 
 [window]
-opacity = 0.9
+opacity = 1.0
 option_as_alt = "Both"
 dynamic_padding = true
 decorations = "Full"

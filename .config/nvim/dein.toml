@@ -82,3 +82,11 @@ repo = 'nvim-tree/nvim-web-devicons'
 
 [[plugins]]
 repo = 'nvim-tree/nvim-tree.lua'
+
+[[plugins]]
+repo = 'akinsho/toggleterm.nvim'
+hook_add = '''
+lua << EOF
+require("toggleterm_config").setup()
+EOF
+'''

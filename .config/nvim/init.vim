@@ -7,6 +7,8 @@ set splitright         "画面を縦分割する際に右に開く
 set clipboard=unnamed  "yank した文字列をクリップボードにコピー
 set hls                "検索した文字をハイライトする
 set noequalalways      "分割時に自動で高さを均等化しない
+set laststatus=3       "グローバル statusline を有効化
+
 "nvim-tree 用に標準の netrw を無効化
 let g:loaded_netrw = 1
 let g:loaded_netrwPlugin = 1
@@ -15,6 +17,10 @@ lua << EOF
   if vim.loop and not vim.uv then
     vim.uv = vim.loop
   end
+EOF
+
+lua << EOF
+  vim.o.statusline = "%!v:lua.require('toggleterm_config').statusline()"
 EOF
 
 let $CACHE = expand('~/.cache')
@@ -114,56 +120,8 @@ lua << EOF
     end
   end
 EOF
-" nvim-tree 幅調整とターミナル制御
+" 幅調整
 lua << EOF
-  local term_bufid = vim.g._term_bufid
-  local term_last_height = vim.g._term_last_height or 12
-
-  local function term_job_active(bufnr)
-    if not (bufnr and vim.api.nvim_buf_is_valid(bufnr)) then
-      return false
-    end
-    local ok, job_id = pcall(vim.api.nvim_buf_get_var, bufnr, "terminal_job_id")
-    if not ok or job_id <= 0 then
-      return false
-    end
-    local status = vim.fn.jobwait({ job_id }, 0)[1]
-    return status == -1
-  end
-
-  local function toggle_bottom_term()
-    local term_win
-    for _, win in ipairs(vim.api.nvim_list_wins()) do
-      local buf = vim.api.nvim_win_get_buf(win)
-      if vim.api.nvim_buf_get_option(buf, "buftype") == "terminal" then
-        term_win = win
-        term_last_height = vim.api.nvim_win_get_height(win)
-        vim.g._term_last_height = term_last_height
-        term_bufid = buf
-        vim.g._term_bufid = term_bufid
-        break
-      end
-    end
-    if term_win then
-      vim.api.nvim_win_close(term_win, true)
-      return
-    end
-    vim.o.equalalways = false
-    vim.cmd("botright 12split")
-    local win = vim.api.nvim_get_current_win()
-    if term_last_height and term_last_height > 0 then
-      vim.api.nvim_win_set_height(win, term_last_height)
-    end
-    if term_job_active(term_bufid) then
-      vim.api.nvim_win_set_buf(win, term_bufid)
-    else
-      vim.cmd("terminal")
-      term_bufid = vim.api.nvim_get_current_buf()
-    end
-    vim.g._term_bufid = term_bufid
-    vim.g._term_last_height = vim.api.nvim_win_get_height(win)
-  end
-
   local function resize_width_current(delta)
     if delta >= 0 then
       vim.cmd("vertical resize +" .. delta)
@@ -180,28 +138,18 @@ lua << EOF
     end
     local buf = vim.api.nvim_get_current_buf()
     if vim.api.nvim_buf_get_option(buf, "buftype") == "terminal" then
-      term_last_height = vim.api.nvim_win_get_height(0)
-      vim.g._term_last_height = term_last_height
+      vim.g._term_last_height = vim.api.nvim_win_get_height(0)
     end
   end
 
   vim.keymap.set("n", "<leader>]", function() resize_width_current(5) end, { silent = true })
   vim.keymap.set("n", "<leader>[", function() resize_width_current(-5) end, { silent = true })
-  vim.keymap.set("n", "<leader>t", toggle_bottom_term, { silent = true })
-  vim.keymap.set("n", "<C-t>", toggle_bottom_term, { silent = true })
   vim.keymap.set("n", "<leader>+", function() resize_height_current(2) end, { silent = true })
   vim.keymap.set("n", "<leader>-", function() resize_height_current(-2) end, { silent = true })
 EOF
 
-" VSCode風レイアウト: 左にツリー、右上エディタ、右下ターミナル（冪等）
+" VSCode風レイアウト: 左にツリー、右上エディタ、右下ターミナル（toggleterm利用）
 lua << EOF
-  local function job_active(bufnr)
-    if not (bufnr and vim.api.nvim_buf_is_valid(bufnr)) then return false end
-    local ok, job = pcall(vim.api.nvim_buf_get_var, bufnr, "terminal_job_id")
-    if not ok or job <= 0 then return false end
-    return vim.fn.jobwait({ job }, 0)[1] == -1
-  end
-
   local function ensure_tree()
     local view = require("nvim-tree.view")
     if not view.is_visible() then
@@ -227,41 +175,32 @@ lua << EOF
   end
 
   local function ensure_terminal_bottom()
-    local term_win = nil
-    local term_buf = nil
+    local ok, term_mod = pcall(require, "toggleterm.terminal")
+    if not ok then
+      vim.notify("toggleterm not available", vim.log.levels.WARN)
+      return
+    end
+    vim.o.equalalways = false
+    term_mod.Terminal:new({
+      direction = "horizontal",
+      count = 1,
+      size = vim.g._term_last_height or 12,
+    }):toggle()
+
+    local term_win
     for _, win in ipairs(vim.api.nvim_list_wins()) do
       local buf = vim.api.nvim_win_get_buf(win)
       if vim.api.nvim_buf_get_option(buf, "buftype") == "terminal" then
         term_win = win
-        term_buf = buf
         break
       end
     end
-    if term_win then
+    if term_win and vim.api.nvim_win_is_valid(term_win) then
       vim.api.nvim_set_current_win(term_win)
       vim.cmd("wincmd J")
       local h = vim.g._term_last_height or 12
       if h > 0 then vim.api.nvim_win_set_height(term_win, h) end
-      return
     end
-
-    local reuse = nil
-    if job_active(vim.g._term_bufid) then
-      reuse = vim.g._term_bufid
-    end
-    vim.o.equalalways = false
-    vim.cmd("botright 12split")
-    local win = vim.api.nvim_get_current_win()
-    local h = vim.g._term_last_height or 12
-    if h > 0 then vim.api.nvim_win_set_height(win, h) end
-    if reuse then
-      vim.api.nvim_win_set_buf(win, reuse)
-    else
-      vim.cmd("terminal")
-      reuse = vim.api.nvim_get_current_buf()
-    end
-    vim.g._term_bufid = reuse
-    vim.g._term_last_height = vim.api.nvim_win_get_height(win)
   end
 
   vim.api.nvim_create_user_command("VscodeLayout", function()
