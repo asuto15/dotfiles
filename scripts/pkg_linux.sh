@@ -12,6 +12,10 @@ as_root() {
   fi
 }
 
+can_run_as_root() {
+  [ "$(id -u)" -eq 0 ] || command -v sudo >/dev/null 2>&1
+}
+
 FAILED_STEPS=()
 SKIPPED_STEPS=()
 APT_UPDATE_FAILED=0
@@ -77,12 +81,20 @@ run_apt_dependent_step() {
 }
 
 ensure_apt_linux() {
+  if ! can_run_as_root; then
+    echo "warn: apt package setup requires root privileges or sudo."
+    echo "warn: rerun as root, install sudo, or use a user with sudo privileges."
+    record_failure "apt root privileges" 1
+    return 1
+  fi
+
   if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
     return 0
   fi
 
   echo "warn: package setup currently supports Debian/Ubuntu-style apt systems only."
   echo "warn: skipping Linux package installation; dotfile links will still be created."
+  record_skip "Linux package installation" "apt-get/dpkg not available"
   return 1
 }
 
@@ -635,6 +647,7 @@ install_cargo_tools() {
 
 install_packages() {
   if ! ensure_apt_linux; then
+    print_failed_steps
     return 0
   fi
 
