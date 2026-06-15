@@ -19,9 +19,9 @@ ensure_sudo() {
   if sudo -n true 2>/dev/null; then
     return
   fi
-  if [ -r /dev/tty ]; then
-    echo "sudo authentication is required."
-    if sudo -v 2>/dev/null </dev/tty; then
+  if { : </dev/tty >/dev/tty; } 2>/dev/null; then
+    echo "sudo authentication is required." >/dev/tty
+    if sudo -v </dev/tty >/dev/tty 2>&1; then
       return
     fi
   else
