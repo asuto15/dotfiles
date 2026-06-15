@@ -5,7 +5,8 @@ as_root() {
   if [ "$(id -u)" -eq 0 ]; then
     "$@"
   elif command -v sudo >/dev/null 2>&1; then
-    sudo "$@"
+    ensure_sudo || return 1
+    sudo -n "$@"
   else
     echo "warn: sudo is required to run $* as a non-root user."
     return 1
@@ -14,6 +15,29 @@ as_root() {
 
 can_run_as_root() {
   [ "$(id -u)" -eq 0 ] || command -v sudo >/dev/null 2>&1
+}
+
+ensure_sudo() {
+  if [ "$(id -u)" -eq 0 ]; then
+    return 0
+  fi
+  if ! command -v sudo >/dev/null 2>&1; then
+    return 1
+  fi
+  if sudo -n true 2>/dev/null; then
+    return 0
+  fi
+  if [ -r /dev/tty ]; then
+    echo "sudo authentication is required."
+    if sudo -v 2>/dev/null </dev/tty; then
+      return 0
+    fi
+    echo "warn: sudo authentication failed."
+    return 1
+  fi
+
+  echo "warn: sudo authentication is required, but no TTY is available."
+  return 1
 }
 
 FAILED_STEPS=()
@@ -85,6 +109,11 @@ ensure_apt_linux() {
     echo "warn: apt package setup requires root privileges or sudo."
     echo "warn: rerun as root, install sudo, or use a user with sudo privileges."
     record_failure "apt root privileges" 1
+    return 1
+  fi
+  if ! ensure_sudo; then
+    echo "warn: apt package setup requires sudo authentication."
+    record_failure "sudo authentication" 1
     return 1
   fi
 

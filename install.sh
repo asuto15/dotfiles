@@ -8,11 +8,36 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
+ensure_sudo() {
+  if [ "$(id -u)" -eq 0 ]; then
+    return
+  fi
+  if ! command_exists sudo; then
+    echo "sudo is required to install prerequisites as a non-root user." >&2
+    exit 1
+  fi
+  if sudo -n true 2>/dev/null; then
+    return
+  fi
+  if [ -r /dev/tty ]; then
+    echo "sudo authentication is required."
+    if sudo -v 2>/dev/null </dev/tty; then
+      return
+    fi
+  else
+    echo "sudo authentication is required, but no TTY is available." >&2
+    exit 1
+  fi
+  echo "sudo authentication failed." >&2
+  exit 1
+}
+
 run_as_root() {
   if [ "$(id -u)" -eq 0 ]; then
     "$@"
   elif command_exists sudo; then
-    sudo "$@"
+    ensure_sudo
+    sudo -n "$@"
   else
     echo "sudo is required to install prerequisites as a non-root user." >&2
     exit 1
@@ -69,6 +94,8 @@ install_prerequisites_linux() {
   if command_exists git && command_exists bash; then
     return
   fi
+
+  ensure_sudo
 
   if command_exists apt-get; then
     run_as_root apt-get update
