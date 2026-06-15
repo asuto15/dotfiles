@@ -7,7 +7,6 @@ record_failure() {
   local name="$1"
   local status="${2:-1}"
   FAILED_STEPS+=("${name} (exit ${status})")
-  echo "warn: ${name} failed with exit ${status}; continuing..."
 }
 
 run_step() {

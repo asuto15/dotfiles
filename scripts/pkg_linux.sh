@@ -13,12 +13,13 @@ as_root() {
 }
 
 FAILED_STEPS=()
+APT_UPDATE_FAILED=0
+APT_UPDATE_SKIP_NOTICE_SHOWN=0
 
 record_failure() {
   local name="$1"
   local status="${2:-1}"
   FAILED_STEPS+=("${name} (exit ${status})")
-  echo "warn: ${name} failed with exit ${status}; continuing..."
 }
 
 run_step() {
@@ -114,14 +115,23 @@ disable_unsupported_neovim_ppa() {
 }
 
 apt_update_once() {
+  if [ "${APT_UPDATE_FAILED}" = "1" ]; then
+    return 1
+  fi
+
   if [ -z "${APT_UPDATED:-}" ] || [ "${APT_UPDATED:-}" = "0" ]; then
     disable_unsupported_neovim_ppa
     echo "Updating apt repositories..."
-    if ! as_root apt-get update -qq; then
-      APT_UPDATED=0
+    if as_root apt-get update -qq; then
+      APT_UPDATED=1
+    else
+      local status="$?"
+      APT_UPDATE_FAILED=1
+      APT_UPDATED=1
+      record_failure "apt update" "${status}"
+      echo "warn: apt update failed; skipping remaining apt package installs."
       return 1
     fi
-    APT_UPDATED=1
   fi
 }
 
@@ -130,7 +140,13 @@ install_pkg() {
   if dpkg -s "${pkg}" >/dev/null 2>&1; then
     return
   fi
-  apt_update_once || return 1
+  if ! apt_update_once; then
+    if [ "${APT_UPDATE_SKIP_NOTICE_SHOWN}" = "0" ]; then
+      echo "warn: apt package installs are skipped because apt update failed."
+      APT_UPDATE_SKIP_NOTICE_SHOWN=1
+    fi
+    return 0
+  fi
   echo "apt install ${pkg}"
   if ! as_root apt-get install -y -qq "${pkg}"; then
     echo "warn: failed to install ${pkg}, continuing..."
