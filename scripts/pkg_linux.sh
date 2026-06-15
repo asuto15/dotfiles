@@ -154,6 +154,67 @@ install_pkg() {
   fi
 }
 
+install_nodejs_from_nodesource() {
+  if [ "${APT_UPDATE_FAILED}" = "1" ]; then
+    return 1
+  fi
+
+  if ! command -v curl >/dev/null 2>&1; then
+    install_pkg "curl" || return 1
+  fi
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "warn: curl is required to install Node.js from NodeSource."
+    return 1
+  fi
+  if ! command -v bash >/dev/null 2>&1; then
+    install_pkg "bash" || return 1
+  fi
+  if ! command -v bash >/dev/null 2>&1; then
+    echo "warn: bash is required to install Node.js from NodeSource."
+    return 1
+  fi
+
+  echo "installing Node.js LTS via NodeSource..."
+  curl -fsSL https://deb.nodesource.com/setup_lts.x | as_root bash - || return 1
+  APT_UPDATED=1
+  install_pkg "nodejs" || return 1
+}
+
+ensure_node_npm() {
+  if command -v npm >/dev/null 2>&1; then
+    return 0
+  fi
+
+  install_pkg "nodejs" || return 1
+  install_pkg "npm" || return 1
+  if [ "${APT_UPDATE_FAILED}" = "1" ]; then
+    return 1
+  fi
+  if command -v npm >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "warn: npm is not available after apt nodejs/npm install; trying NodeSource LTS."
+  install_nodejs_from_nodesource || return 1
+  if command -v npm >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "warn: npm is still not available after NodeSource install."
+  return 1
+}
+
+npm_global_install() {
+  local npm_bin prefix
+  npm_bin="$(command -v npm)" || return 1
+  prefix="$(npm config get prefix 2>/dev/null || true)"
+
+  case "${prefix}" in
+    "${HOME}"/*) "${npm_bin}" install -g "$@" ;;
+    *) as_root "${npm_bin}" install -g "$@" ;;
+  esac
+}
+
 install_starship() {
   if command -v starship >/dev/null 2>&1; then
     return
@@ -359,27 +420,15 @@ install_rustup() {
 }
 
 install_node_stack() {
-  install_pkg "nodejs" || return 1
-  install_pkg "npm" || return 1
-  if command -v npm >/dev/null 2>&1; then
-    echo "npm install -g yarn pnpm"
-    npm install -g yarn pnpm || return 1
-  else
-    echo "warn: npm not available; skipping yarn/pnpm install."
-    return 1
-  fi
+  ensure_node_npm || return 1
+  echo "npm install -g yarn pnpm"
+  npm_global_install yarn pnpm || return 1
 }
 
 install_ai_clis() {
-  install_pkg "nodejs" || return 1
-  install_pkg "npm" || return 1
-  if command -v npm >/dev/null 2>&1; then
-    echo "npm install -g @openai/codex @anthropic-ai/claude-code"
-    npm install -g @openai/codex @anthropic-ai/claude-code || return 1
-  else
-    echo "warn: npm not available; skipping codex/claude-code install."
-    return 1
-  fi
+  ensure_node_npm || return 1
+  echo "npm install -g @openai/codex @anthropic-ai/claude-code"
+  npm_global_install @openai/codex @anthropic-ai/claude-code || return 1
 }
 
 install_uv() {
