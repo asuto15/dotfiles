@@ -12,6 +12,45 @@ as_root() {
   fi
 }
 
+FAILED_STEPS=()
+
+record_failure() {
+  local name="$1"
+  local status="${2:-1}"
+  FAILED_STEPS+=("${name} (exit ${status})")
+  echo "warn: ${name} failed with exit ${status}; continuing..."
+}
+
+run_step() {
+  local name="$1"
+  local status
+  shift
+
+  echo "==> ${name}"
+  if "$@"; then
+    return 0
+  else
+    status="$?"
+  fi
+
+  record_failure "${name}" "${status}"
+  return 0
+}
+
+print_failed_steps() {
+  if [ "${#FAILED_STEPS[@]}" -eq 0 ]; then
+    return 0
+  fi
+
+  echo
+  echo "Setup completed with failed steps:"
+  printf '  - %s\n' "${FAILED_STEPS[@]}"
+  if [ "${SETUP_STRICT:-0}" = "1" ]; then
+    return 1
+  fi
+  return 0
+}
+
 ensure_apt_linux() {
   if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
     return 0
@@ -22,10 +61,66 @@ ensure_apt_linux() {
   return 1
 }
 
+ubuntu_codename() {
+  if [ -r /etc/os-release ]; then
+    . /etc/os-release
+    printf '%s\n' "${VERSION_CODENAME:-${UBUNTU_CODENAME:-}}"
+  fi
+}
+
+url_exists() {
+  local url="$1"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsIL --retry 2 --retry-delay 1 "${url}" >/dev/null 2>&1
+  elif command -v wget >/dev/null 2>&1; then
+    wget -q --spider "${url}" >/dev/null 2>&1
+  else
+    return 1
+  fi
+}
+
+neovim_ppa_supports_current_ubuntu() {
+  local codename
+  codename="$(ubuntu_codename)"
+  [ -n "${codename}" ] || return 1
+  url_exists "https://ppa.launchpadcontent.net/neovim-ppa/stable/ubuntu/dists/${codename}/Release"
+}
+
+disable_apt_source() {
+  local source_file="$1"
+  local disabled="${source_file}.disabled"
+  if [ ! -e "${source_file}" ]; then
+    return 0
+  fi
+  if [ -e "${disabled}" ]; then
+    disabled="${source_file}.disabled.$(date +%Y%m%d%H%M%S)"
+  fi
+  echo "Disabling unsupported apt source: ${source_file}"
+  as_root mv "${source_file}" "${disabled}"
+}
+
+disable_unsupported_neovim_ppa() {
+  local source_file
+  if neovim_ppa_supports_current_ubuntu; then
+    return 0
+  fi
+
+  for source_file in \
+    /etc/apt/sources.list.d/neovim-ppa-ubuntu-stable.list \
+    /etc/apt/sources.list.d/neovim-ppa-ubuntu-stable.sources
+  do
+    disable_apt_source "${source_file}" || true
+  done
+}
+
 apt_update_once() {
   if [ -z "${APT_UPDATED:-}" ] || [ "${APT_UPDATED:-}" = "0" ]; then
+    disable_unsupported_neovim_ppa
     echo "Updating apt repositories..."
-    as_root apt-get update -qq
+    if ! as_root apt-get update -qq; then
+      APT_UPDATED=0
+      return 1
+    fi
     APT_UPDATED=1
   fi
 }
@@ -35,10 +130,11 @@ install_pkg() {
   if dpkg -s "${pkg}" >/dev/null 2>&1; then
     return
   fi
-  apt_update_once
+  apt_update_once || return 1
   echo "apt install ${pkg}"
   if ! as_root apt-get install -y -qq "${pkg}"; then
     echo "warn: failed to install ${pkg}, continuing..."
+    return 1
   fi
 }
 
@@ -80,9 +176,9 @@ install_from_list() {
   while IFS= read -r pkg; do
     case "${pkg}" in
       ""|\#*) continue ;;
-      eza) install_eza ;;
-      starship) install_starship ;;
-      *) install_pkg "${pkg}" ;;
+      eza) run_step "install eza" install_eza ;;
+      starship) run_step "install starship" install_starship ;;
+      *) run_step "install ${pkg}" install_pkg "${pkg}" ;;
     esac
   done < "${list_file}"
 }
@@ -225,10 +321,13 @@ install_neovim() {
   fi
 
   if is_ubuntu; then
-    ensure_neovim_ppa
-    install_pkg "neovim"
-    if neovim_is_modern; then
-      return
+    if ensure_neovim_ppa; then
+      install_pkg "neovim" || true
+      if neovim_is_modern; then
+        return
+      fi
+    else
+      echo "warn: neovim PPA is unavailable for this Ubuntu release; using release tarball."
     fi
   fi
 
@@ -244,25 +343,26 @@ install_rustup() {
 }
 
 install_node_stack() {
-  install_pkg "nodejs"
-  install_pkg "npm"
+  install_pkg "nodejs" || return 1
+  install_pkg "npm" || return 1
   if command -v npm >/dev/null 2>&1; then
     echo "npm install -g yarn pnpm"
-    npm install -g yarn pnpm || echo "warn: npm global install (yarn/pnpm) failed."
+    npm install -g yarn pnpm || return 1
   else
     echo "warn: npm not available; skipping yarn/pnpm install."
+    return 1
   fi
 }
 
 install_ai_clis() {
-  install_pkg "nodejs"
-  install_pkg "npm"
+  install_pkg "nodejs" || return 1
+  install_pkg "npm" || return 1
   if command -v npm >/dev/null 2>&1; then
     echo "npm install -g @openai/codex @anthropic-ai/claude-code"
-    npm install -g @openai/codex @anthropic-ai/claude-code \
-      || echo "warn: npm global install (codex/claude-code) failed."
+    npm install -g @openai/codex @anthropic-ai/claude-code || return 1
   else
     echo "warn: npm not available; skipping codex/claude-code install."
+    return 1
   fi
 }
 
@@ -280,30 +380,28 @@ install_uv() {
     return
   fi
   echo "installing uv..."
-  if ! "${downloader[@]}" | sh; then
-    echo "warn: uv installer failed."
-  fi
+  "${downloader[@]}" | sh
 }
 
 install_vscode_official() {
   if command -v code >/dev/null 2>&1; then
     return
   fi
-  install_pkg "wget"
-  install_pkg "gpg"
+  install_pkg "wget" || return 1
+  install_pkg "gpg" || return 1
   local keyring="/usr/share/keyrings/microsoft.gpg"
   local list_file="/etc/apt/sources.list.d/vscode.list"
   if [ ! -f "${keyring}" ]; then
     echo "adding Microsoft GPG key..."
-    wget -qO- https://packages.microsoft.com/keys/microsoft.asc | as_root gpg --dearmor -o "${keyring}"
+    wget -qO- https://packages.microsoft.com/keys/microsoft.asc | as_root gpg --dearmor -o "${keyring}" || return 1
   fi
   if [ ! -f "${list_file}" ]; then
     echo "adding VSCode apt repo..."
     echo "deb [arch=$(dpkg --print-architecture) signed-by=${keyring}] https://packages.microsoft.com/repos/code stable main" \
-      | as_root tee "${list_file}" >/dev/null
+      | as_root tee "${list_file}" >/dev/null || return 1
     APT_UPDATED=0
   fi
-  install_pkg "apt-transport-https"
+  install_pkg "apt-transport-https" || return 1
   install_pkg "code"
 }
 
@@ -311,19 +409,19 @@ install_cursor_official() {
   if command -v cursor >/dev/null 2>&1; then
     return
   fi
-  install_pkg "wget"
-  install_pkg "gpg"
+  install_pkg "wget" || return 1
+  install_pkg "gpg" || return 1
   local keyring="/etc/apt/keyrings/cursor-archive-keyring.gpg"
   local list_file="/etc/apt/sources.list.d/cursor.list"
-  as_root mkdir -p /etc/apt/keyrings
+  as_root mkdir -p /etc/apt/keyrings || return 1
   if [ ! -f "${keyring}" ]; then
     echo "adding Cursor GPG key..."
-    wget -qO- https://dl.cursor.sh/apt/pubkey.gpg | as_root gpg --dearmor -o "${keyring}"
+    wget -qO- https://dl.cursor.sh/apt/pubkey.gpg | as_root gpg --dearmor -o "${keyring}" || return 1
   fi
   if [ ! -f "${list_file}" ]; then
     echo "adding Cursor apt repo..."
     echo "deb [arch=$(dpkg --print-architecture) signed-by=${keyring}] https://dl.cursor.sh/apt stable main" \
-      | as_root tee "${list_file}" >/dev/null
+      | as_root tee "${list_file}" >/dev/null || return 1
     APT_UPDATED=0
   fi
   install_pkg "cursor"
@@ -338,6 +436,7 @@ install_alacritty() {
     return
   fi
   echo "warn: alacritty package not available via apt-cache; install manually if needed."
+  return 1
 }
 
 ensure_cargo_binstall() {
@@ -430,8 +529,8 @@ install_packages() {
 
   install_from_list "${DOTFILES_DIR}/packages/common.txt"
   install_from_list "${DOTFILES_DIR}/packages/linux.txt"
-  select_linux_profile
-  select_optional_tools
+  run_step "select Linux profile" select_linux_profile
+  run_step "select optional tools" select_optional_tools
   case "${LINUX_PROFILE:-client}" in
     client) install_from_list "${DOTFILES_DIR}/packages/linux_client.txt" ;;
     server) install_from_list "${DOTFILES_DIR}/packages/linux_server.txt" ;;
@@ -440,30 +539,30 @@ install_packages() {
   esac
 
   if [ "${INSTALL_NODE_STACK}" = "1" ]; then
-    install_node_stack
+    run_step "install Node.js/npm/yarn/pnpm" install_node_stack
   fi
   if [ "${INSTALL_AI_CLI}" = "1" ]; then
-    install_ai_clis
+    run_step "install Codex/Claude Code CLI" install_ai_clis
   fi
   if [ "${INSTALL_UV}" = "1" ]; then
-    install_uv
+    run_step "install uv" install_uv
   fi
   if [ "${INSTALL_VSCODE}" = "1" ]; then
-    install_vscode_official
+    run_step "install VSCode" install_vscode_official
   fi
   if [ "${INSTALL_ALACRITTY}" = "1" ]; then
-    install_alacritty
+    run_step "install Alacritty" install_alacritty
   fi
   if [ "${INSTALL_CURSOR}" = "1" ]; then
-    install_cursor_official
+    run_step "install Cursor" install_cursor_official
   fi
 
-  install_neovim
-  install_rustup
-  install_cargo_tools
-  install_rust_projects
+  run_step "install Neovim" install_neovim
+  run_step "install rustup" install_rustup
+  run_step "install cargo tools" install_cargo_tools
+  run_step "install Rust projects" install_rust_projects
 
-  ensure_fd_linux
+  run_step "ensure fd" ensure_fd_linux
   # Ensure common aliases exist when Debian/Ubuntu package names differ.
   if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then
     mkdir -p "${HOME}/.local/bin"
@@ -471,8 +570,10 @@ install_packages() {
   fi
 
   if [ "${INSTALL_TAILSCALE:-0}" = "1" ]; then
-    install_tailscale_linux
+    run_step "install Tailscale" install_tailscale_linux
   fi
+
+  print_failed_steps
 }
 
 neovim_is_modern() {
@@ -496,12 +597,18 @@ is_ubuntu() {
 }
 
 ensure_neovim_ppa() {
-  if [ -f /etc/apt/sources.list.d/neovim-ppa-ubuntu-stable.list ]; then
+  if ! neovim_ppa_supports_current_ubuntu; then
+    disable_unsupported_neovim_ppa
+    return 1
+  fi
+
+  if [ -f /etc/apt/sources.list.d/neovim-ppa-ubuntu-stable.list ] \
+    || [ -f /etc/apt/sources.list.d/neovim-ppa-ubuntu-stable.sources ]; then
     return
   fi
 
-  install_pkg "software-properties-common"
-  as_root add-apt-repository -y ppa:neovim-ppa/stable
+  install_pkg "software-properties-common" || return 1
+  as_root add-apt-repository -y ppa:neovim-ppa/stable || return 1
   APT_UPDATED=0  # force apt update after adding repo
 }
 
@@ -526,8 +633,14 @@ install_neovim_release_tarball() {
   fi
 
   # Extract to /usr/local and symlink nvim.
-  as_root tar -C /usr/local -xzf "${tmp_dir}/nvim.tar.gz"
-  as_root ln -sfn /usr/local/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
+  as_root tar -C /usr/local -xzf "${tmp_dir}/nvim.tar.gz" || {
+    rm -rf "${tmp_dir}"
+    return 1
+  }
+  as_root ln -sfn /usr/local/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim || {
+    rm -rf "${tmp_dir}"
+    return 1
+  }
 
   rm -rf "${tmp_dir}"
 }
@@ -551,15 +664,23 @@ install_eza() {
   as_root install -m 0755 -d /etc/apt/keyrings
   tmp_key="$(mktemp)"
   if curl -fsSL https://raw.githubusercontent.com/eza-community/eza/main/deb.asc -o "${tmp_key}"; then
-    as_root gpg --dearmor -o "${keyring}" "${tmp_key}"
-    as_root chmod a+r "${keyring}"
+    as_root gpg --dearmor -o "${keyring}" "${tmp_key}" || {
+      rm -f "${tmp_key}"
+      return 1
+    }
+    as_root chmod a+r "${keyring}" || {
+      rm -f "${tmp_key}"
+      return 1
+    }
   else
     echo "warn: failed to download eza repo key."
+    rm -f "${tmp_key}"
+    return 1
   fi
   rm -f "${tmp_key}"
 
   echo "deb [arch=${arch} signed-by=${keyring}] http://deb.gierens.de stable main" \
-    | as_root tee "${list_file}" >/dev/null
+    | as_root tee "${list_file}" >/dev/null || return 1
 
   # Repo was just added; ensure apt update runs before install.
   APT_UPDATED=0
@@ -575,12 +696,13 @@ ensure_fd_linux() {
 
   # Provide fd alias for Debian/Ubuntu package name.
   if command -v fdfind >/dev/null 2>&1; then
-    as_root mkdir -p /usr/local/bin
-    as_root ln -sfn "$(command -v fdfind)" /usr/local/bin/fd
+    as_root mkdir -p /usr/local/bin || return 1
+    as_root ln -sfn "$(command -v fdfind)" /usr/local/bin/fd || return 1
     return
   fi
 
   echo "warn: fd-find installation failed; fd not available."
+  return 1
 }
 
 install_tailscale_linux() {
@@ -591,8 +713,10 @@ install_tailscale_linux() {
 
   # Add Tailscale apt repo if missing
   if [ ! -f /etc/apt/sources.list.d/tailscale.list ]; then
-    curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.gpg | as_root tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
-    curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.list | as_root tee /etc/apt/sources.list.d/tailscale.list >/dev/null
+    curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.gpg \
+      | as_root tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null || return 1
+    curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.list \
+      | as_root tee /etc/apt/sources.list.d/tailscale.list >/dev/null || return 1
     APT_UPDATED=0  # force apt update after adding repo
   fi
 

@@ -1,6 +1,45 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+FAILED_STEPS=()
+
+record_failure() {
+  local name="$1"
+  local status="${2:-1}"
+  FAILED_STEPS+=("${name} (exit ${status})")
+  echo "warn: ${name} failed with exit ${status}; continuing..."
+}
+
+run_step() {
+  local name="$1"
+  local status
+  shift
+
+  echo "==> ${name}"
+  if "$@"; then
+    return 0
+  else
+    status="$?"
+  fi
+
+  record_failure "${name}" "${status}"
+  return 0
+}
+
+print_failed_steps() {
+  if [ "${#FAILED_STEPS[@]}" -eq 0 ]; then
+    return 0
+  fi
+
+  echo
+  echo "Setup completed with failed steps:"
+  printf '  - %s\n' "${FAILED_STEPS[@]}"
+  if [ "${SETUP_STRICT:-0}" = "1" ]; then
+    return 1
+  fi
+  return 0
+}
+
 ensure_cargo_binstall() {
   if command -v cargo-binstall >/dev/null 2>&1; then
     return
@@ -91,6 +130,7 @@ ensure_homebrew() {
 
 install_from_list() {
   local list_file="$1"
+  local pkg status
   [ -f "${list_file}" ] || return 0
 
   while IFS= read -r pkg; do
@@ -101,7 +141,12 @@ install_from_list() {
       continue
     fi
     echo "brew install ${pkg}"
-    brew install "${pkg}"
+    if brew install "${pkg}"; then
+      :
+    else
+      status="$?"
+      record_failure "brew install ${pkg}" "${status}"
+    fi
   done < "${list_file}"
 }
 
@@ -153,9 +198,10 @@ install_ai_clis() {
   if command -v npm >/dev/null 2>&1; then
     echo "npm install -g @openai/codex @anthropic-ai/claude-code"
     npm install -g @openai/codex @anthropic-ai/claude-code \
-      || echo "warn: npm global install (codex/claude-code) failed."
+      || return 1
   else
     echo "warn: npm not available; skipping codex/claude-code install."
+    return 1
   fi
 }
 
@@ -163,29 +209,35 @@ install_packages() {
   ensure_homebrew
 
   echo "Updating Homebrew..."
-  if ! brew update; then
-    echo "warn: brew update failed; continuing with current Homebrew metadata."
+  if brew update; then
+    :
+  else
+    record_failure "brew update" "$?"
   fi
 
   # Prefer Brewfile if present for full environment parity.
   if [ -f "${DOTFILES_DIR}/Brewfile" ]; then
     echo "Applying Brewfile..."
-    if ! brew bundle --file "${DOTFILES_DIR}/Brewfile"; then
-      echo "warn: brew bundle failed; continuing with the rest of setup."
+    if brew bundle --file "${DOTFILES_DIR}/Brewfile"; then
+      :
+    else
+      record_failure "brew bundle" "$?"
     fi
   fi
 
-  install_from_list "${DOTFILES_DIR}/packages/common.txt"
-  install_from_list "${DOTFILES_DIR}/packages/macos.txt"
+  run_step "install common Homebrew packages" install_from_list "${DOTFILES_DIR}/packages/common.txt"
+  run_step "install macOS Homebrew packages" install_from_list "${DOTFILES_DIR}/packages/macos.txt"
 
-  install_ai_clis
-  install_rustup
-  install_cargo_tools
-  install_rust_projects
+  run_step "install Codex/Claude Code CLI" install_ai_clis
+  run_step "install rustup" install_rustup
+  run_step "install cargo tools" install_cargo_tools
+  run_step "install Rust projects" install_rust_projects
 
   if [ "${INSTALL_TAILSCALE:-0}" = "1" ]; then
-    install_tailscale_macos
+    run_step "install Tailscale" install_tailscale_macos
   fi
+
+  print_failed_steps
 }
 
 install_tailscale_macos() {
