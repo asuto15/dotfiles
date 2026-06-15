@@ -13,6 +13,7 @@ as_root() {
 }
 
 FAILED_STEPS=()
+SKIPPED_STEPS=()
 APT_UPDATE_FAILED=0
 APT_UPDATE_SKIP_NOTICE_SHOWN=0
 
@@ -20,6 +21,12 @@ record_failure() {
   local name="$1"
   local status="${2:-1}"
   FAILED_STEPS+=("${name} (exit ${status})")
+}
+
+record_skip() {
+  local name="$1"
+  local reason="$2"
+  SKIPPED_STEPS+=("${name}: ${reason}")
 }
 
 run_step() {
@@ -39,17 +46,34 @@ run_step() {
 }
 
 print_failed_steps() {
-  if [ "${#FAILED_STEPS[@]}" -eq 0 ]; then
-    return 0
+  if [ "${#FAILED_STEPS[@]}" -gt 0 ]; then
+    echo
+    echo "Setup completed with failed steps:"
+    printf '  - %s\n' "${FAILED_STEPS[@]}"
   fi
 
-  echo
-  echo "Setup completed with failed steps:"
-  printf '  - %s\n' "${FAILED_STEPS[@]}"
-  if [ "${SETUP_STRICT:-0}" = "1" ]; then
+  if [ "${#SKIPPED_STEPS[@]}" -gt 0 ]; then
+    echo
+    echo "Skipped steps:"
+    printf '  - %s\n' "${SKIPPED_STEPS[@]}"
+  fi
+
+  if [ "${#FAILED_STEPS[@]}" -gt 0 ] && [ "${SETUP_STRICT:-0}" = "1" ]; then
     return 1
   fi
   return 0
+}
+
+run_apt_dependent_step() {
+  local name="$1"
+  shift
+
+  if [ "${APT_UPDATE_FAILED}" = "1" ]; then
+    record_skip "${name}" "apt update failed"
+    return 0
+  fi
+
+  run_step "${name}" "$@"
 }
 
 ensure_apt_linux() {
@@ -183,6 +207,10 @@ install_nodejs_from_nodesource() {
 ensure_node_npm() {
   if command -v npm >/dev/null 2>&1; then
     return 0
+  fi
+
+  if [ "${APT_UPDATE_FAILED}" = "1" ]; then
+    return 1
   fi
 
   install_pkg "nodejs" || return 1
@@ -419,6 +447,24 @@ install_rustup() {
     | sh -s -- -y --no-modify-path --default-toolchain stable
 }
 
+ensure_rust_build_deps() {
+  if command -v cc >/dev/null 2>&1; then
+    return 0
+  fi
+
+  if [ "${APT_UPDATE_FAILED}" = "1" ]; then
+    return 1
+  fi
+
+  install_pkg "build-essential" || return 1
+  if command -v cc >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "warn: cc is still not available after installing build-essential."
+  return 1
+}
+
 install_node_stack() {
   ensure_node_npm || return 1
   echo "npm install -g yarn pnpm"
@@ -604,10 +650,10 @@ install_packages() {
   esac
 
   if [ "${INSTALL_NODE_STACK}" = "1" ]; then
-    run_step "install Node.js/npm/yarn/pnpm" install_node_stack
+    run_apt_dependent_step "install Node.js/npm/yarn/pnpm" install_node_stack
   fi
   if [ "${INSTALL_AI_CLI}" = "1" ]; then
-    run_step "install Codex/Claude Code CLI" install_ai_clis
+    run_apt_dependent_step "install Codex/Claude Code CLI" install_ai_clis
   fi
   if [ "${INSTALL_UV}" = "1" ]; then
     run_step "install uv" install_uv
@@ -623,11 +669,22 @@ install_packages() {
   fi
 
   run_step "install Neovim" install_neovim
+  run_apt_dependent_step "install Rust build dependencies" ensure_rust_build_deps
   run_step "install rustup" install_rustup
-  run_step "install cargo tools" install_cargo_tools
-  run_step "install Rust projects" install_rust_projects
+  if command -v cc >/dev/null 2>&1; then
+    run_step "install cargo tools" install_cargo_tools
+    run_step "install Rust projects" install_rust_projects
+  elif [ "${APT_UPDATE_FAILED}" = "1" ]; then
+    record_skip "install cargo tools" "cc unavailable because apt update failed"
+    record_skip "install Rust projects" "cc unavailable because apt update failed"
+    echo "warn: skipping Rust CLI builds because cc is not available."
+  else
+    record_failure "install cargo tools" 1
+    record_failure "install Rust projects" 1
+    echo "warn: skipping Rust CLI builds because cc is not available."
+  fi
 
-  run_step "ensure fd" ensure_fd_linux
+  run_apt_dependent_step "ensure fd" ensure_fd_linux
   # Ensure common aliases exist when Debian/Ubuntu package names differ.
   if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then
     mkdir -p "${HOME}/.local/bin"
@@ -753,6 +810,10 @@ install_eza() {
 }
 
 ensure_fd_linux() {
+  if [ "${APT_UPDATE_FAILED}" = "1" ]; then
+    return 1
+  fi
+
   if command -v fd >/dev/null 2>&1; then
     return
   fi
