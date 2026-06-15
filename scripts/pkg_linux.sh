@@ -166,17 +166,29 @@ disable_apt_source() {
 }
 
 disable_unsupported_neovim_ppa() {
-  local source_file
+  local source_dir source_file
   if neovim_ppa_supports_current_ubuntu; then
     return 0
   fi
 
-  for source_file in \
-    /etc/apt/sources.list.d/neovim-ppa-ubuntu-stable.list \
-    /etc/apt/sources.list.d/neovim-ppa-ubuntu-stable.sources
-  do
+  source_dir="${APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
+  for source_file in "${source_dir}"/*.list "${source_dir}"/*.sources; do
+    [ -e "${source_file}" ] || continue
+    grep -Eq 'ppa\.launchpadcontent\.net/neovim-ppa/stable|neovim-ppa' "${source_file}" || continue
     disable_apt_source "${source_file}" || true
   done
+}
+
+has_neovim_ppa_source() {
+  local source_dir source_file
+  source_dir="${APT_SOURCES_DIR:-/etc/apt/sources.list.d}"
+  for source_file in "${source_dir}"/*.list "${source_dir}"/*.sources; do
+    [ -e "${source_file}" ] || continue
+    if grep -Eq 'ppa\.launchpadcontent\.net/neovim-ppa/stable|neovim-ppa' "${source_file}"; then
+      return 0
+    fi
+  done
+  return 1
 }
 
 apt_update_once() {
@@ -766,8 +778,7 @@ ensure_neovim_ppa() {
     return 1
   fi
 
-  if [ -f /etc/apt/sources.list.d/neovim-ppa-ubuntu-stable.list ] \
-    || [ -f /etc/apt/sources.list.d/neovim-ppa-ubuntu-stable.sources ]; then
+  if has_neovim_ppa_source; then
     return
   fi
 
