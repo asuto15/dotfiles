@@ -73,7 +73,7 @@ bindings = [
 { key = "Right", mods = "Command", chars = "\u0005" },
 { key = "Home", chars = "\u0001" },
 { key = "End", chars = "\u0005" },
-{ key = "V", mods = "Command | Shift", action = "ToggleViMode" },
+# Disable Alacritty vi mode by removing the toggle binding.
 ]
 
 [bell]

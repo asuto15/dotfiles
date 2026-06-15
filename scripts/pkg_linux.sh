@@ -121,6 +121,7 @@ select_linux_profile() {
 select_optional_tools() {
   # Defaults per profile
   local default_node_stack="n"
+  local default_ai_cli="y"
   local default_uv="n"
   local default_vscode="n"
   local default_alacritty="n"
@@ -154,6 +155,9 @@ select_optional_tools() {
   if [ -n "${INSTALL_NODE_STACK:-}" ]; then
     default_node_stack=$([ "${INSTALL_NODE_STACK}" = "1" ] && echo "y" || echo "n")
   fi
+  if [ -n "${INSTALL_AI_CLI:-}" ]; then
+    default_ai_cli=$([ "${INSTALL_AI_CLI}" = "1" ] && echo "y" || echo "n")
+  fi
   if [ -n "${INSTALL_UV:-}" ]; then
     default_uv=$([ "${INSTALL_UV}" = "1" ] && echo "y" || echo "n")
   fi
@@ -168,6 +172,7 @@ select_optional_tools() {
   fi
 
   INSTALL_NODE_STACK="0"
+  INSTALL_AI_CLI="0"
   INSTALL_UV="0"
   INSTALL_VSCODE="0"
   INSTALL_ALACRITTY="0"
@@ -175,6 +180,9 @@ select_optional_tools() {
 
   if prompt_yes_no "Install Node.js/npm/yarn/pnpm?" "${default_node_stack}"; then
     INSTALL_NODE_STACK="1"
+  fi
+  if prompt_yes_no "Install Codex/Claude Code CLI?" "${default_ai_cli}"; then
+    INSTALL_AI_CLI="1"
   fi
   if prompt_yes_no "Install uv (Python package manager)?" "${default_uv}"; then
     INSTALL_UV="1"
@@ -222,6 +230,18 @@ install_node_stack() {
     npm install -g yarn pnpm || echo "warn: npm global install (yarn/pnpm) failed."
   else
     echo "warn: npm not available; skipping yarn/pnpm install."
+  fi
+}
+
+install_ai_clis() {
+  install_pkg "nodejs"
+  install_pkg "npm"
+  if command -v npm >/dev/null 2>&1; then
+    echo "npm install -g @openai/codex @anthropic-ai/claude-code"
+    npm install -g @openai/codex @anthropic-ai/claude-code \
+      || echo "warn: npm global install (codex/claude-code) failed."
+  else
+    echo "warn: npm not available; skipping codex/claude-code install."
   fi
 }
 
@@ -396,6 +416,9 @@ install_packages() {
 
   if [ "${INSTALL_NODE_STACK}" = "1" ]; then
     install_node_stack
+  fi
+  if [ "${INSTALL_AI_CLI}" = "1" ]; then
+    install_ai_clis
   fi
   if [ "${INSTALL_UV}" = "1" ]; then
     install_uv

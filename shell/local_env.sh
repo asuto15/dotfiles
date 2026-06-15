@@ -7,3 +7,14 @@ case ":${PATH}:" in
     export PATH
     ;;
 esac
+
+# LM Studio CLI (lms)
+case ":${PATH}:" in
+  *:"${HOME}/.lmstudio/bin":*) ;;
+  *)
+    if [ -d "${HOME}/.lmstudio/bin" ]; then
+      PATH="${PATH}:${HOME}/.lmstudio/bin"
+      export PATH
+    fi
+    ;;
+esac

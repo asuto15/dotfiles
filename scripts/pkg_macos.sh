@@ -131,6 +131,25 @@ install_cargo_tools() {
   done < "${list_file}"
 }
 
+install_ai_clis() {
+  if [ "${INSTALL_AI_CLI:-1}" != "1" ]; then
+    return
+  fi
+
+  if ! command -v npm >/dev/null 2>&1; then
+    echo "npm unavailable; installing node via Homebrew..."
+    brew install node
+  fi
+
+  if command -v npm >/dev/null 2>&1; then
+    echo "npm install -g @openai/codex @anthropic-ai/claude-code"
+    npm install -g @openai/codex @anthropic-ai/claude-code \
+      || echo "warn: npm global install (codex/claude-code) failed."
+  else
+    echo "warn: npm not available; skipping codex/claude-code install."
+  fi
+}
+
 install_packages() {
   ensure_homebrew
 
@@ -146,6 +165,7 @@ install_packages() {
   install_from_list "${DOTFILES_DIR}/packages/common.txt"
   install_from_list "${DOTFILES_DIR}/packages/macos.txt"
 
+  install_ai_clis
   install_rustup
   install_cargo_tools
   install_rust_projects
