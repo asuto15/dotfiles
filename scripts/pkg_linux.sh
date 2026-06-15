@@ -1,10 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+as_root() {
+  if [ "$(id -u)" -eq 0 ]; then
+    "$@"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo "$@"
+  else
+    echo "warn: sudo is required to run $* as a non-root user."
+    return 1
+  fi
+}
+
+ensure_apt_linux() {
+  if command -v apt-get >/dev/null 2>&1 && command -v dpkg >/dev/null 2>&1; then
+    return 0
+  fi
+
+  echo "warn: package setup currently supports Debian/Ubuntu-style apt systems only."
+  echo "warn: skipping Linux package installation; dotfile links will still be created."
+  return 1
+}
+
 apt_update_once() {
   if [ -z "${APT_UPDATED:-}" ] || [ "${APT_UPDATED:-}" = "0" ]; then
     echo "Updating apt repositories..."
-    sudo apt-get update -qq
+    as_root apt-get update -qq
     APT_UPDATED=1
   fi
 }
@@ -16,7 +37,7 @@ install_pkg() {
   fi
   apt_update_once
   echo "apt install ${pkg}"
-  if ! sudo apt-get install -y -qq "${pkg}"; then
+  if ! as_root apt-get install -y -qq "${pkg}"; then
     echo "warn: failed to install ${pkg}, continuing..."
   fi
 }
@@ -274,12 +295,12 @@ install_vscode_official() {
   local list_file="/etc/apt/sources.list.d/vscode.list"
   if [ ! -f "${keyring}" ]; then
     echo "adding Microsoft GPG key..."
-    wget -qO- https://packages.microsoft.com/keys/microsoft.asc | sudo gpg --dearmor -o "${keyring}"
+    wget -qO- https://packages.microsoft.com/keys/microsoft.asc | as_root gpg --dearmor -o "${keyring}"
   fi
   if [ ! -f "${list_file}" ]; then
     echo "adding VSCode apt repo..."
     echo "deb [arch=$(dpkg --print-architecture) signed-by=${keyring}] https://packages.microsoft.com/repos/code stable main" \
-      | sudo tee "${list_file}" >/dev/null
+      | as_root tee "${list_file}" >/dev/null
     APT_UPDATED=0
   fi
   install_pkg "apt-transport-https"
@@ -294,15 +315,15 @@ install_cursor_official() {
   install_pkg "gpg"
   local keyring="/etc/apt/keyrings/cursor-archive-keyring.gpg"
   local list_file="/etc/apt/sources.list.d/cursor.list"
-  sudo mkdir -p /etc/apt/keyrings
+  as_root mkdir -p /etc/apt/keyrings
   if [ ! -f "${keyring}" ]; then
     echo "adding Cursor GPG key..."
-    wget -qO- https://dl.cursor.sh/apt/pubkey.gpg | sudo gpg --dearmor -o "${keyring}"
+    wget -qO- https://dl.cursor.sh/apt/pubkey.gpg | as_root gpg --dearmor -o "${keyring}"
   fi
   if [ ! -f "${list_file}" ]; then
     echo "adding Cursor apt repo..."
     echo "deb [arch=$(dpkg --print-architecture) signed-by=${keyring}] https://dl.cursor.sh/apt stable main" \
-      | sudo tee "${list_file}" >/dev/null
+      | as_root tee "${list_file}" >/dev/null
     APT_UPDATED=0
   fi
   install_pkg "cursor"
@@ -403,6 +424,10 @@ install_cargo_tools() {
 }
 
 install_packages() {
+  if ! ensure_apt_linux; then
+    return 0
+  fi
+
   install_from_list "${DOTFILES_DIR}/packages/common.txt"
   install_from_list "${DOTFILES_DIR}/packages/linux.txt"
   select_linux_profile
@@ -476,7 +501,7 @@ ensure_neovim_ppa() {
   fi
 
   install_pkg "software-properties-common"
-  sudo add-apt-repository -y ppa:neovim-ppa/stable
+  as_root add-apt-repository -y ppa:neovim-ppa/stable
   APT_UPDATED=0  # force apt update after adding repo
 }
 
@@ -501,8 +526,8 @@ install_neovim_release_tarball() {
   fi
 
   # Extract to /usr/local and symlink nvim.
-  sudo tar -C /usr/local -xzf "${tmp_dir}/nvim.tar.gz"
-  sudo ln -sfn /usr/local/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
+  as_root tar -C /usr/local -xzf "${tmp_dir}/nvim.tar.gz"
+  as_root ln -sfn /usr/local/nvim-linux-x86_64/bin/nvim /usr/local/bin/nvim
 
   rm -rf "${tmp_dir}"
 }
@@ -523,18 +548,18 @@ install_eza() {
   install_pkg "curl"
   install_pkg "gnupg"
 
-  sudo install -m 0755 -d /etc/apt/keyrings
+  as_root install -m 0755 -d /etc/apt/keyrings
   tmp_key="$(mktemp)"
   if curl -fsSL https://raw.githubusercontent.com/eza-community/eza/main/deb.asc -o "${tmp_key}"; then
-    sudo gpg --dearmor -o "${keyring}" "${tmp_key}"
-    sudo chmod a+r "${keyring}"
+    as_root gpg --dearmor -o "${keyring}" "${tmp_key}"
+    as_root chmod a+r "${keyring}"
   else
     echo "warn: failed to download eza repo key."
   fi
   rm -f "${tmp_key}"
 
   echo "deb [arch=${arch} signed-by=${keyring}] http://deb.gierens.de stable main" \
-    | sudo tee "${list_file}" >/dev/null
+    | as_root tee "${list_file}" >/dev/null
 
   # Repo was just added; ensure apt update runs before install.
   APT_UPDATED=0
@@ -550,8 +575,8 @@ ensure_fd_linux() {
 
   # Provide fd alias for Debian/Ubuntu package name.
   if command -v fdfind >/dev/null 2>&1; then
-    sudo mkdir -p /usr/local/bin
-    sudo ln -sfn "$(command -v fdfind)" /usr/local/bin/fd
+    as_root mkdir -p /usr/local/bin
+    as_root ln -sfn "$(command -v fdfind)" /usr/local/bin/fd
     return
   fi
 
@@ -566,8 +591,8 @@ install_tailscale_linux() {
 
   # Add Tailscale apt repo if missing
   if [ ! -f /etc/apt/sources.list.d/tailscale.list ]; then
-    curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.gpg | sudo tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
-    curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.list | sudo tee /etc/apt/sources.list.d/tailscale.list >/dev/null
+    curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.gpg | as_root tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null
+    curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.list | as_root tee /etc/apt/sources.list.d/tailscale.list >/dev/null
     APT_UPDATED=0  # force apt update after adding repo
   fi
 

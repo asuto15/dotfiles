@@ -67,8 +67,17 @@ ensure_homebrew() {
     return
   fi
 
+  if ! command -v curl >/dev/null 2>&1; then
+    echo "curl is required to install Homebrew."
+    exit 1
+  fi
+  if [ ! -x /bin/bash ]; then
+    echo "/bin/bash is required to install Homebrew."
+    exit 1
+  fi
+
   echo "Installing Homebrew..."
-  /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
   if [ -x /opt/homebrew/bin/brew ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
@@ -154,12 +163,16 @@ install_packages() {
   ensure_homebrew
 
   echo "Updating Homebrew..."
-  brew update
+  if ! brew update; then
+    echo "warn: brew update failed; continuing with current Homebrew metadata."
+  fi
 
   # Prefer Brewfile if present for full environment parity.
   if [ -f "${DOTFILES_DIR}/Brewfile" ]; then
     echo "Applying Brewfile..."
-    brew bundle --file "${DOTFILES_DIR}/Brewfile"
+    if ! brew bundle --file "${DOTFILES_DIR}/Brewfile"; then
+      echo "warn: brew bundle failed; continuing with the rest of setup."
+    fi
   fi
 
   install_from_list "${DOTFILES_DIR}/packages/common.txt"
