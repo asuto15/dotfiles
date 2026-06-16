@@ -214,9 +214,6 @@ apt_update_once() {
 
 install_pkg() {
   local pkg="$1"
-  if dpkg -s "${pkg}" >/dev/null 2>&1; then
-    return
-  fi
   if ! apt_update_once; then
     if [ "${APT_UPDATE_SKIP_NOTICE_SHOWN}" = "0" ]; then
       echo "warn: apt package installs are skipped because apt update failed."
@@ -224,7 +221,7 @@ install_pkg() {
     fi
     return 0
   fi
-  echo "apt install ${pkg}"
+  echo "apt install/upgrade ${pkg}"
   if ! as_root apt-get install -y -qq "${pkg}"; then
     echo "warn: failed to install ${pkg}, continuing..."
     return 1
@@ -494,6 +491,7 @@ install_neovim() {
 
 install_rustup() {
   if command -v rustup >/dev/null 2>&1; then
+    rustup update stable
     return
   fi
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
@@ -520,14 +518,14 @@ ensure_rust_build_deps() {
 
 install_node_stack() {
   ensure_node_npm || return 1
-  echo "npm install -g yarn pnpm"
-  npm_global_install yarn pnpm || return 1
+  echo "npm install -g yarn@latest pnpm@latest"
+  npm_global_install yarn@latest pnpm@latest || return 1
 }
 
 install_ai_clis() {
   ensure_node_npm || return 1
-  echo "npm install -g @openai/codex @anthropic-ai/claude-code"
-  npm_global_install @openai/codex @anthropic-ai/claude-code || return 1
+  echo "npm install -g @openai/codex@latest @anthropic-ai/claude-code@latest"
+  npm_global_install @openai/codex@latest @anthropic-ai/claude-code@latest || return 1
 }
 
 install_uv() {

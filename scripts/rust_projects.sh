@@ -20,11 +20,6 @@ install_rust_project() {
 
   ensure_cargo_bin_path
 
-  if command -v "${binary_name}" >/dev/null 2>&1; then
-    echo "${binary_name} already installed; skipping."
-    return
-  fi
-
   if ! command -v cargo >/dev/null 2>&1; then
     echo "warn: cargo is not available; skipping ${binary_name}."
     return
@@ -57,9 +52,9 @@ install_rust_project() {
     git clone --depth 1 "${repo_url}" "${repo_dir}"
   fi
 
-  echo "cargo install --path ${repo_dir}"
-  if ! cargo install --path "${repo_dir}" --locked; then
-    cargo install --path "${repo_dir}" || true
+  echo "cargo install --force --path ${repo_dir}"
+  if ! cargo install --force --path "${repo_dir}" --locked; then
+    cargo install --force --path "${repo_dir}" || true
   fi
 }
 

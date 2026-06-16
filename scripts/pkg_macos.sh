@@ -137,6 +137,13 @@ install_from_list() {
       ""|\#*) continue ;;
     esac
     if brew list --versions "${pkg}" >/dev/null 2>&1; then
+      echo "brew upgrade ${pkg}"
+      if brew upgrade "${pkg}"; then
+        :
+      else
+        status="$?"
+        record_failure "brew upgrade ${pkg}" "${status}"
+      fi
       continue
     fi
     echo "brew install ${pkg}"
@@ -151,6 +158,7 @@ install_from_list() {
 
 install_rustup() {
   if [ -d "${HOME}/.rustup" ]; then
+    rustup update stable
     return
   fi
 
@@ -195,8 +203,8 @@ install_ai_clis() {
   fi
 
   if command -v npm >/dev/null 2>&1; then
-    echo "npm install -g @openai/codex @anthropic-ai/claude-code"
-    npm install -g @openai/codex @anthropic-ai/claude-code \
+    echo "npm install -g @openai/codex@latest @anthropic-ai/claude-code@latest"
+    npm install -g @openai/codex@latest @anthropic-ai/claude-code@latest \
       || return 1
   else
     echo "warn: npm not available; skipping codex/claude-code install."
