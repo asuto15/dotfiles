@@ -31,6 +31,7 @@ fi
 
 # Local user bin paths
 prepend_path_if_exists "${HOME}/.local/bin"
+prepend_path_if_exists "${HOME}/.npm-global/bin"
 prepend_path_if_exists "${HOME}/.cargo/bin"
 prepend_path_if_exists "${HOME}/.anyenv/bin"
 

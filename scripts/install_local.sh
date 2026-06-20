@@ -21,6 +21,7 @@ esac
 export DOTFILES_DIR
 
 source "${DOTFILES_DIR}/scripts/rust_projects.sh"
+source "${DOTFILES_DIR}/scripts/npm.sh"
 source "${DOTFILES_DIR}/scripts/pkg_${PLATFORM}.sh"
 source "${DOTFILES_DIR}/scripts/link.sh"
 

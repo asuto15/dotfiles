@@ -203,6 +203,7 @@ install_ai_clis() {
   fi
 
   if command -v npm >/dev/null 2>&1; then
+    ensure_npm_global_prefix || return 1
     echo "npm install -g @openai/codex@latest @anthropic-ai/claude-code@latest"
     npm install -g @openai/codex@latest @anthropic-ai/claude-code@latest \
       || return 1

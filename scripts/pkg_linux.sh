@@ -283,14 +283,11 @@ ensure_node_npm() {
 }
 
 npm_global_install() {
-  local npm_bin prefix
+  local npm_bin
   npm_bin="$(command -v npm)" || return 1
-  prefix="$(npm config get prefix 2>/dev/null || true)"
+  ensure_npm_global_prefix || return 1
 
-  case "${prefix}" in
-    "${HOME}"/*) "${npm_bin}" install -g "$@" ;;
-    *) as_root "${npm_bin}" install -g "$@" ;;
-  esac
+  "${npm_bin}" install -g "$@"
 }
 
 install_starship() {
