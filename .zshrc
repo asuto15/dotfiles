@@ -1,7 +1,14 @@
 autoload -U compinit
 compinit
 
-DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "${(%):-%N}")" && pwd)}"
+zshrc_path="${(%):-%x}"
+if command -v realpath >/dev/null 2>&1; then
+  zshrc_path="$(realpath "${zshrc_path}")"
+else
+  zshrc_path="${zshrc_path:A}"
+fi
+DOTFILES_DIR="${DOTFILES_DIR:-$(cd "$(dirname "${zshrc_path}")" && pwd)}"
+unset zshrc_path
 [ -f "${DOTFILES_DIR}/shell/common_env.sh" ] && source "${DOTFILES_DIR}/shell/common_env.sh"
 [ -f "${DOTFILES_DIR}/shell/local_env.sh" ] && source "${DOTFILES_DIR}/shell/local_env.sh"
 

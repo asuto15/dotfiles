@@ -1,28 +1,17 @@
 #!/usr/bin/env bash
 # Common environment for both zsh/bash. Keep POSIX-compatible constructs.
 
-prepend_path_if_exists() {
-  local dir="$1"
-  case ":${PATH}:" in
-    *:"${dir}":*) return ;;
-  esac
-  if [ -d "${dir}" ]; then
-    PATH="${dir}:${PATH}"
-  fi
-}
+if [ -n "${BASH_SOURCE[0]:-}" ]; then
+  COMMON_ENV_FILE="${BASH_SOURCE[0]}"
+else
+  COMMON_ENV_FILE="${(%):-%x}"
+fi
+COMMON_ENV_DIR="$(cd "$(dirname "${COMMON_ENV_FILE}")" && pwd)"
+. "${COMMON_ENV_DIR}/path_helpers.sh"
+unset COMMON_ENV_DIR COMMON_ENV_FILE
 
 # Detect Homebrew prefix without assuming architecture
-if command -v brew >/dev/null 2>&1; then
-  BREW_PREFIX="$(brew --prefix)"
-elif [ -d "/opt/homebrew" ]; then
-  BREW_PREFIX="/opt/homebrew"
-elif [ -d "/usr/local/Homebrew" ]; then
-  BREW_PREFIX="/usr/local"
-elif [ -d "/home/linuxbrew/.linuxbrew" ]; then
-  BREW_PREFIX="/home/linuxbrew/.linuxbrew"
-else
-  BREW_PREFIX=""
-fi
+ensure_brew_prefix
 
 if [ -n "${BREW_PREFIX}" ]; then
   prepend_path_if_exists "${BREW_PREFIX}/bin"
@@ -32,6 +21,9 @@ fi
 # Local user bin paths
 prepend_path_if_exists "${HOME}/.local/bin"
 prepend_path_if_exists "${HOME}/.npm-global/bin"
+if [ -n "${BREW_PREFIX}" ]; then
+  prepend_path_if_exists "${BREW_PREFIX}/opt/rustup/bin"
+fi
 prepend_path_if_exists "${HOME}/.cargo/bin"
 prepend_path_if_exists "${HOME}/.anyenv/bin"
 

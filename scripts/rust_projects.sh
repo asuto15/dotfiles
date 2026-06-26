@@ -6,9 +6,12 @@ set -euo pipefail
 
 ensure_cargo_bin_path() {
   # Make cargo available for the current session if it is already installed.
-  if [ -d "${HOME}/.cargo/bin" ] && ! command -v cargo >/dev/null 2>&1; then
-    export PATH="${HOME}/.cargo/bin:${PATH}"
+  local dotfiles_dir
+  dotfiles_dir="${DOTFILES_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+  if ! command -v ensure_cargo_path >/dev/null 2>&1; then
+    . "${dotfiles_dir}/scripts/cargo_path.sh"
   fi
+  ensure_cargo_path
 }
 
 install_rust_project() {

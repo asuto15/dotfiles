@@ -157,7 +157,8 @@ install_from_list() {
 }
 
 install_rustup() {
-  if [ -d "${HOME}/.rustup" ]; then
+  ensure_cargo_path
+  if command -v rustup >/dev/null 2>&1; then
     rustup update stable
     return
   fi
@@ -168,11 +169,13 @@ install_rustup() {
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
       | sh -s -- -y --no-modify-path --default-toolchain stable
   fi
+  ensure_cargo_path
 }
 
 install_cargo_tools() {
   local list_file="${DOTFILES_DIR}/cargo-tools.txt"
   [ -f "${list_file}" ] || return 0
+  ensure_cargo_path
   command -v cargo >/dev/null 2>&1 || return 0
 
   ensure_cargo_binstall

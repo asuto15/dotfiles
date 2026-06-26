@@ -487,12 +487,14 @@ install_neovim() {
 }
 
 install_rustup() {
+  ensure_cargo_path
   if command -v rustup >/dev/null 2>&1; then
     rustup update stable
     return
   fi
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs \
     | sh -s -- -y --no-modify-path --default-toolchain stable
+  ensure_cargo_path
 }
 
 ensure_rust_build_deps() {
@@ -662,6 +664,7 @@ ensure_cargo_binstall() {
 install_cargo_tools() {
   local list_file="${DOTFILES_DIR}/cargo-tools.txt"
   [ -f "${list_file}" ] || return 0
+  ensure_cargo_path
   command -v cargo >/dev/null 2>&1 || return 0
 
   ensure_cargo_binstall
