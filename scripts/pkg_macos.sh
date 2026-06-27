@@ -53,13 +53,19 @@ ensure_cargo_binstall() {
     *) echo "warn: unsupported arch for cargo-binstall: ${arch}"; return ;;
   esac
   case "${os}" in
-    Linux) target="${arch}-unknown-linux-gnu" ;;
-    Darwin) target="${arch}-apple-darwin" ;;
+    Linux)
+      target="${arch}-unknown-linux-gnu"
+      set -- tgz tar.gz
+      ;;
+    Darwin)
+      target="${arch}-apple-darwin"
+      set -- zip full.zip
+      ;;
     *) echo "warn: unsupported OS for cargo-binstall: ${os}"; return ;;
   esac
 
   tmp="$(mktemp -d /tmp/cargo-binstall.XXXXXX)"
-  for ext in tgz tar.gz; do
+  for ext in "$@"; do
     url="https://github.com/cargo-bins/cargo-binstall/releases/latest/download/cargo-binstall-${target}.${ext}"
     echo "downloading cargo-binstall from ${url}..."
     if command -v curl >/dev/null 2>&1; then
@@ -85,7 +91,24 @@ ensure_cargo_binstall() {
     return
   fi
 
-  if ! tar -xzf "${tmp}/cargo-binstall."* -C "${tmp}"; then
+  case "${ext}" in
+    tgz|tar.gz)
+      tar -xzf "${tmp}/cargo-binstall.${ext}" -C "${tmp}" || {
+        echo "warn: failed to extract cargo-binstall."
+        rm -rf "${tmp}"
+        return
+      }
+      ;;
+    zip|full.zip)
+      unzip -q "${tmp}/cargo-binstall.${ext}" -d "${tmp}" || {
+        echo "warn: failed to extract cargo-binstall."
+        rm -rf "${tmp}"
+        return
+      }
+      ;;
+  esac
+
+  if [ ! -x "${tmp}/cargo-binstall" ]; then
     echo "warn: failed to extract cargo-binstall."
     rm -rf "${tmp}"
     return
@@ -125,6 +148,27 @@ ensure_homebrew() {
     echo "Homebrew installation failed."
     exit 1
   fi
+}
+
+ensure_homebrew_bundle_trust() {
+  if ! brew trust --help >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local formula cask
+  for formula in \
+    cloudflare/cloudflare/cf-terraforming \
+    xcodesorg/made/xcodes
+  do
+    brew trust --formula "${formula}" || return 1
+  done
+
+  for cask in \
+    beutton/brew/wattsec \
+    nikitabobko/tap/aerospace
+  do
+    brew trust --cask "${cask}" || return 1
+  done
 }
 
 install_from_list() {
@@ -228,6 +272,13 @@ install_packages() {
 
   # Prefer Brewfile if present for full environment parity.
   if [ -f "${DOTFILES_DIR}/Brewfile" ]; then
+    echo "Trusting Brewfile third-party entries..."
+    if ensure_homebrew_bundle_trust; then
+      :
+    else
+      record_failure "brew trust Brewfile entries" "$?"
+    fi
+
     echo "Applying Brewfile..."
     if brew bundle --file "${DOTFILES_DIR}/Brewfile"; then
       :

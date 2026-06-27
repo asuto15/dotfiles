@@ -335,6 +335,78 @@ install_from_list() {
   done < "${list_file}"
 }
 
+linux_install_state_file() {
+  printf '%s\n' "${DOTFILES_LINUX_STATE_FILE:-${XDG_CONFIG_HOME:-${HOME}/.config}/dotfiles/linux-install.env}"
+}
+
+load_linux_install_state() {
+  local file key value
+  file="$(linux_install_state_file)"
+  [ -f "${file}" ] || return 0
+
+  while IFS='=' read -r key value; do
+    case "${key}" in
+      LINUX_PROFILE)
+        if [ -z "${LINUX_PROFILE+x}" ]; then
+          case "${value}" in client|server|none) LINUX_PROFILE="${value}" ;; esac
+        fi
+        ;;
+      INSTALL_NODE_STACK)
+        if [ -z "${INSTALL_NODE_STACK+x}" ]; then
+          case "${value}" in 0|1) INSTALL_NODE_STACK="${value}" ;; esac
+        fi
+        ;;
+      INSTALL_AI_CLI)
+        if [ -z "${INSTALL_AI_CLI+x}" ]; then
+          case "${value}" in 0|1) INSTALL_AI_CLI="${value}" ;; esac
+        fi
+        ;;
+      INSTALL_UV)
+        if [ -z "${INSTALL_UV+x}" ]; then
+          case "${value}" in 0|1) INSTALL_UV="${value}" ;; esac
+        fi
+        ;;
+      INSTALL_VSCODE)
+        if [ -z "${INSTALL_VSCODE+x}" ]; then
+          case "${value}" in 0|1) INSTALL_VSCODE="${value}" ;; esac
+        fi
+        ;;
+      INSTALL_ALACRITTY)
+        if [ -z "${INSTALL_ALACRITTY+x}" ]; then
+          case "${value}" in 0|1) INSTALL_ALACRITTY="${value}" ;; esac
+        fi
+        ;;
+      INSTALL_CURSOR)
+        if [ -z "${INSTALL_CURSOR+x}" ]; then
+          case "${value}" in 0|1) INSTALL_CURSOR="${value}" ;; esac
+        fi
+        ;;
+    esac
+  done < "${file}"
+}
+
+save_linux_install_state() {
+  local file dir tmp
+  file="$(linux_install_state_file)"
+  dir="$(dirname "${file}")"
+  mkdir -p "${dir}" || return 1
+  tmp="$(mktemp "${dir}/linux-install.env.XXXXXX")" || return 1
+
+  {
+    printf 'LINUX_PROFILE=%s\n' "${LINUX_PROFILE:-client}"
+    printf 'INSTALL_NODE_STACK=%s\n' "${INSTALL_NODE_STACK:-0}"
+    printf 'INSTALL_AI_CLI=%s\n' "${INSTALL_AI_CLI:-0}"
+    printf 'INSTALL_UV=%s\n' "${INSTALL_UV:-0}"
+    printf 'INSTALL_VSCODE=%s\n' "${INSTALL_VSCODE:-0}"
+    printf 'INSTALL_ALACRITTY=%s\n' "${INSTALL_ALACRITTY:-0}"
+    printf 'INSTALL_CURSOR=%s\n' "${INSTALL_CURSOR:-0}"
+  } > "${tmp}" || {
+    rm -f "${tmp}"
+    return 1
+  }
+  mv "${tmp}" "${file}"
+}
+
 prompt_yes_no() {
   local prompt default answer
   prompt="$1"
@@ -395,6 +467,10 @@ select_optional_tools() {
   local default_vscode="n"
   local default_alacritty="n"
   local default_cursor="n"
+
+  case "${INSTALL_NODE_STACK:-}:${INSTALL_AI_CLI:-}:${INSTALL_UV:-}:${INSTALL_VSCODE:-}:${INSTALL_ALACRITTY:-}:${INSTALL_CURSOR:-}" in
+    [01]:[01]:[01]:[01]:[01]:[01]) return ;;
+  esac
 
   case "${LINUX_PROFILE:-client}" in
     client)
@@ -690,10 +766,15 @@ install_packages() {
     return 0
   fi
 
+  load_linux_install_state
+
   install_from_list "${DOTFILES_DIR}/packages/common.txt"
   install_from_list "${DOTFILES_DIR}/packages/linux.txt"
   run_step "select Linux profile" select_linux_profile
   run_step "select optional tools" select_optional_tools
+  if ! save_linux_install_state; then
+    record_failure "save Linux install selection" 1
+  fi
   case "${LINUX_PROFILE:-client}" in
     client) install_from_list "${DOTFILES_DIR}/packages/linux_client.txt" ;;
     server) install_from_list "${DOTFILES_DIR}/packages/linux_server.txt" ;;
@@ -826,31 +907,33 @@ install_eza() {
 
   local keyring="/etc/apt/keyrings/gierens.gpg"
   local list_file="/etc/apt/sources.list.d/gierens.list"
-  local arch tmp_key
+  local arch tmp_key tmp_keyring
   arch="$(dpkg --print-architecture)"
 
   # Ensure prerequisites for fetching keys exist.
-  install_pkg "ca-certificates"
-  install_pkg "curl"
-  install_pkg "gnupg"
+  install_pkg "ca-certificates" || return 1
+  install_pkg "curl" || return 1
+  install_pkg "gnupg" || return 1
 
   as_root install -m 0755 -d /etc/apt/keyrings
   tmp_key="$(mktemp)"
+  tmp_keyring="$(mktemp)"
+  rm -f "${tmp_keyring}"
   if curl -fsSL https://raw.githubusercontent.com/eza-community/eza/main/deb.asc -o "${tmp_key}"; then
-    as_root gpg --dearmor -o "${keyring}" "${tmp_key}" || {
-      rm -f "${tmp_key}"
+    gpg --dearmor -o "${tmp_keyring}" "${tmp_key}" || {
+      rm -f "${tmp_key}" "${tmp_keyring}"
       return 1
     }
-    as_root chmod a+r "${keyring}" || {
-      rm -f "${tmp_key}"
+    as_root install -m 0644 "${tmp_keyring}" "${keyring}" || {
+      rm -f "${tmp_key}" "${tmp_keyring}"
       return 1
     }
   else
     echo "warn: failed to download eza repo key."
-    rm -f "${tmp_key}"
+    rm -f "${tmp_key}" "${tmp_keyring}"
     return 1
   fi
-  rm -f "${tmp_key}"
+  rm -f "${tmp_key}" "${tmp_keyring}"
 
   echo "deb [arch=${arch} signed-by=${keyring}] http://deb.gierens.de stable main" \
     | as_root tee "${list_file}" >/dev/null || return 1
@@ -888,12 +971,21 @@ install_tailscale_linux() {
     return
   fi
 
-  # Add Tailscale apt repo if missing
-  if [ ! -f /etc/apt/sources.list.d/tailscale.list ]; then
+  local keyring="/usr/share/keyrings/tailscale-archive-keyring.gpg"
+  local list_file="/etc/apt/sources.list.d/tailscale.list"
+  local repo_changed=0
+
+  if [ ! -f "${keyring}" ]; then
     curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.gpg \
-      | as_root tee /usr/share/keyrings/tailscale-archive-keyring.gpg >/dev/null || return 1
+      | as_root tee "${keyring}" >/dev/null || return 1
+    repo_changed=1
+  fi
+  if [ ! -f "${list_file}" ]; then
     curl -fsSL https://pkgs.tailscale.com/stable/ubuntu/jammy.list \
-      | as_root tee /etc/apt/sources.list.d/tailscale.list >/dev/null || return 1
+      | as_root tee "${list_file}" >/dev/null || return 1
+    repo_changed=1
+  fi
+  if [ "${repo_changed}" = "1" ]; then
     APT_UPDATED=0  # force apt update after adding repo
   fi
 
