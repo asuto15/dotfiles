@@ -53,8 +53,23 @@ run_local_installer() {
 }
 
 ensure_homebrew() {
+  brew_bin=""
   if command_exists brew; then
+    brew_bin="$(command -v brew)"
+  elif [ -x /opt/homebrew/bin/brew ]; then
+    brew_bin="/opt/homebrew/bin/brew"
+  elif [ -x /usr/local/bin/brew ]; then
+    brew_bin="/usr/local/bin/brew"
+  fi
+
+  if [ -n "${brew_bin}" ]; then
+    eval "$("${brew_bin}" shellenv)"
     return
+  fi
+
+  if [ "${DOTFILES_ROLE:-auto}" = "secondary" ]; then
+    echo "DOTFILES_ROLE=secondary requires an existing Homebrew installation." >&2
+    exit 1
   fi
 
   if ! command_exists curl; then

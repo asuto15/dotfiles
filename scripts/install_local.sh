@@ -23,10 +23,17 @@ export DOTFILES_DIR
 source "${DOTFILES_DIR}/scripts/cargo_path.sh"
 source "${DOTFILES_DIR}/scripts/rust_projects.sh"
 source "${DOTFILES_DIR}/scripts/npm.sh"
+source "${DOTFILES_DIR}/scripts/install_role.sh"
 source "${DOTFILES_DIR}/scripts/pkg_${PLATFORM}.sh"
 source "${DOTFILES_DIR}/scripts/link.sh"
 
+resolve_dotfiles_role
+echo "Dotfiles install role: ${DOTFILES_ROLE} (${DOTFILES_ROLE_REASON})"
+
 install_packages
 link_dotfiles
+if command -v print_platform_post_install_notes >/dev/null 2>&1; then
+  print_platform_post_install_notes
+fi
 
 echo "Done."

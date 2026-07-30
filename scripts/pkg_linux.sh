@@ -761,6 +761,12 @@ install_cargo_tools() {
 }
 
 install_packages() {
+  if [ "${DOTFILES_ROLE:-primary}" = "secondary" ]; then
+    echo "Secondary role: skipping shared Linux package-manager mutations."
+    echo "Dotfile links will still be installed for this user."
+    return
+  fi
+
   if ! ensure_apt_linux; then
     print_failed_steps
     return 0

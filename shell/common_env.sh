@@ -43,12 +43,37 @@ fi
 # macOS framework Python (falls back to default if not present)
 prepend_path_if_exists "/Library/Frameworks/Python.framework/Versions/Current/bin"
 
-# LLVM flags (only if installed via Homebrew)
-if [ -n "${BREW_PREFIX}" ] && [ -d "${BREW_PREFIX}/opt/llvm" ]; then
-  export LDFLAGS="-L${BREW_PREFIX}/opt/llvm/lib${LDFLAGS:+:${LDFLAGS}}"
-  export CPPFLAGS="-I${BREW_PREFIX}/opt/llvm/include${CPPFLAGS:+:${CPPFLAGS}}"
-  prepend_path_if_exists "${BREW_PREFIX}/opt/llvm/bin"
+# Keep keg-only Homebrew LLVM opt-in. In particular, its `dsymutil` cannot be
+# mixed with another LLVM build's `libLLVM.dylib` while building rustc.
+if [ -n "${BREW_PREFIX}" ]; then
+  remove_path_entry "${BREW_PREFIX}/opt/llvm/bin"
 fi
+
+enable_homebrew_llvm() {
+  ensure_brew_prefix
+
+  local llvm_prefix
+  llvm_prefix="${BREW_PREFIX}/opt/llvm"
+  if [ -z "${BREW_PREFIX}" ] || [ ! -d "${llvm_prefix}" ]; then
+    printf '%s\n' "Homebrew LLVM is not installed." >&2
+    return 1
+  fi
+
+  prepend_path_if_exists "${llvm_prefix}/bin"
+  case " ${LDFLAGS:-} " in
+    *" -L${llvm_prefix}/lib "*) ;;
+    *) LDFLAGS="-L${llvm_prefix}/lib${LDFLAGS:+ ${LDFLAGS}}" ;;
+  esac
+  case " ${CPPFLAGS:-} " in
+    *" -I${llvm_prefix}/include "*) ;;
+    *) CPPFLAGS="-I${llvm_prefix}/include${CPPFLAGS:+ ${CPPFLAGS}}" ;;
+  esac
+
+  CC="${llvm_prefix}/bin/clang"
+  CXX="${llvm_prefix}/bin/clang++"
+  LLVM_CONFIG="${llvm_prefix}/bin/llvm-config"
+  export PATH LDFLAGS CPPFLAGS CC CXX LLVM_CONFIG
+}
 
 # Starship configuration
 export STARSHIP_CONFIG="${HOME}/.config/starship/starship.toml"

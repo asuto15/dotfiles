@@ -15,6 +15,14 @@ prepend_path_if_exists() {
   fi
 }
 
+remove_path_entry() {
+  local dir="$1"
+  PATH=":${PATH}:"
+  PATH="${PATH//:${dir}:/:}"
+  PATH="${PATH#:}"
+  PATH="${PATH%:}"
+}
+
 detect_brew_prefix() {
   if command -v brew >/dev/null 2>&1; then
     brew --prefix
