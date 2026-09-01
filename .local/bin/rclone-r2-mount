@@ -1,0 +1,38 @@
+#!/bin/zsh
+set -euo pipefail
+
+readonly rclone_bin=/usr/local/bin/rclone
+readonly mountpoint=/Users/asuto153/mnt/r2
+readonly cache_dir=/Users/asuto153/Library/Caches/rclone/r2-mount
+readonly log_file=/Users/asuto153/Library/Logs/rclone-r2-mount.log
+
+/bin/mkdir -p "$mountpoint" "$cache_dir" "${log_file:h}"
+
+if /sbin/mount | /usr/bin/grep -F " on $mountpoint " >/dev/null 2>&1; then
+  exit 0
+fi
+
+exec "$rclone_bin" nfsmount r2-all: "$mountpoint" \
+  --dir-cache-time 30s \
+  --poll-interval 0 \
+  --vfs-cache-mode full \
+  --vfs-cache-max-size 50G \
+  --vfs-cache-max-age 24h \
+  --vfs-cache-min-free-space 20G \
+  --vfs-cache-poll-interval 1m \
+  --vfs-write-back 5s \
+  --cache-dir "$cache_dir" \
+  --noappledouble \
+  --noapplexattr \
+  --exclude '.DS_Store' \
+  --exclude '**/.DS_Store' \
+  --exclude '._*' \
+  --exclude '**/._*' \
+  --exclude '.Spotlight-V100/**' \
+  --exclude '**/.Spotlight-V100/**' \
+  --exclude '.Trashes/**' \
+  --exclude '**/.Trashes/**' \
+  --exclude '.fseventsd/**' \
+  --exclude '**/.fseventsd/**' \
+  --log-file "$log_file" \
+  --log-level INFO

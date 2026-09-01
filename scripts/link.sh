@@ -86,7 +86,10 @@ link_dotfiles() {
     ".bashrc"
     ".config/nvim"
     ".config/alacritty"
+    ".config/omniwm"
     ".config/starship"
+    ".local/bin/rclone-r2-mount"
+    "Library/LaunchAgents/dev.asuto153.rclone-r2-mount.plist"
   )
 
   for item in "${links[@]}"; do
