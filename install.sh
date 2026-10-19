@@ -4,8 +4,60 @@ set -eu
 DOTFILES_REPO_URL="${DOTFILES_REPO_URL:-https://github.com/asuto15/dotfiles.git}"
 DOTFILES_DIR="${DOTFILES_DIR:-${HOME}/dotfiles}"
 
+for option in "$@"; do
+  case "${option}" in
+    --minimal) DOTFILES_MINIMAL=1 ;;
+    -h|--help)
+      echo "Usage: install.sh [--minimal]"
+      echo "  Without options, choose a setup mode interactively on macOS."
+      echo "  --minimal  Link dotfiles only; do not install additional software."
+      exit 0
+      ;;
+    *) echo "Unknown option: ${option}" >&2; exit 1 ;;
+  esac
+done
+case "${DOTFILES_MINIMAL:-0}" in
+  0|1) ;;
+  *) echo "DOTFILES_MINIMAL must be 0 or 1." >&2; exit 1 ;;
+esac
+
 command_exists() {
   command -v "$1" >/dev/null 2>&1
+}
+
+select_install_mode() {
+  INSTALLER_USE_TTY=0
+  if [ -n "${NONINTERACTIVE:-}${CI:-}" ]; then
+    export DOTFILES_MACOS_INTERACTIVE=0
+  fi
+
+  # Ask before installing even bootstrap prerequisites. Explicit environment
+  # selections and unattended runs retain their existing behavior.
+  if [ "${DOTFILES_MINIMAL+x}" != x ] &&
+     [ -z "${DOTFILES_MACOS_COMPONENTS:-}" ] &&
+     [ "${DOTFILES_MACOS_INTERACTIVE:-auto}" != 0 ] &&
+     [ "$(uname -s)" = Darwin ] &&
+     { : </dev/tty >/dev/tty; } 2>/dev/null; then
+    cat >/dev/tty <<'EOF'
+Choose a setup mode:
+  1) Minimal: link dotfiles only; install no additional software (default)
+  2) Custom: choose which software components to install
+EOF
+    while :; do
+      printf 'Setup mode [1/2, default: 1]: ' >/dev/tty
+      if ! IFS= read -r setup_mode </dev/tty; then
+        echo "No setup mode selected; aborting." >&2
+        return 1
+      fi
+      case "${setup_mode}" in
+        ""|1) DOTFILES_MINIMAL=1; break ;;
+        2) DOTFILES_MINIMAL=0; break ;;
+        *) echo "Please enter 1 or 2." >/dev/tty ;;
+      esac
+    done
+    INSTALLER_USE_TTY=1
+  fi
+  export DOTFILES_MINIMAL="${DOTFILES_MINIMAL:-0}"
 }
 
 ensure_sudo() {
@@ -46,6 +98,9 @@ run_as_root() {
 
 run_local_installer() {
   if command_exists bash; then
+    if [ "${INSTALLER_USE_TTY:-0}" = 1 ]; then
+      exec bash "${DOTFILES_DIR}/scripts/install_local.sh" </dev/tty
+    fi
     exec bash "${DOTFILES_DIR}/scripts/install_local.sh"
   fi
   echo "bash is required to run the local installer." >&2
@@ -82,7 +137,15 @@ ensure_homebrew() {
   fi
 
   echo "Installing Homebrew..."
-  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  # Check the download separately: bash -c "" would otherwise report success.
+  homebrew_installer="$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || return 1
+  # A curl | sh bootstrap has piped stdin, but can still have a controlling
+  # terminal. Let Homebrew authenticate sudo itself on that terminal.
+  if [ -z "${NONINTERACTIVE:-}${CI:-}" ] && { : </dev/tty; } 2>/dev/null; then
+    /bin/bash -c "${homebrew_installer}" </dev/tty || return 1
+  else
+    NONINTERACTIVE=1 /bin/bash -c "${homebrew_installer}" || return 1
+  fi
 
   if [ -x /opt/homebrew/bin/brew ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
@@ -95,9 +158,13 @@ ensure_homebrew() {
 }
 
 install_prerequisites_macos() {
-  ensure_homebrew
+  if git_available && command_exists bash; then
+    return
+  fi
 
-  if ! command_exists git; then
+  ensure_homebrew || return 1
+
+  if ! git_available; then
     brew install git
   fi
   if ! command_exists bash; then
@@ -132,6 +199,15 @@ install_prerequisites_linux() {
 }
 
 install_prerequisites() {
+  if [ "${DOTFILES_MINIMAL:-0}" = "1" ]; then
+    if git_available && command_exists bash; then
+      return
+    fi
+    echo "Minimal setup requires working Git and Bash; no software was installed." >&2
+    echo "On macOS, install Apple's Command Line Tools with xcode-select --install, then rerun." >&2
+    exit 1
+  fi
+
   case "$(uname -s)" in
     Darwin) install_prerequisites_macos ;;
     Linux) install_prerequisites_linux ;;
@@ -141,7 +217,7 @@ install_prerequisites() {
       ;;
   esac
 
-  if ! command_exists git; then
+  if ! git_available; then
     echo "git installation failed or git is not on PATH." >&2
     exit 1
   fi
@@ -149,6 +225,15 @@ install_prerequisites() {
     echo "bash installation failed or bash is not on PATH." >&2
     exit 1
   fi
+}
+
+git_available() {
+  command_exists git || return 1
+  # /usr/bin/git exists even before Apple's Command Line Tools are installed.
+  if [ "$(uname -s)" = Darwin ] && [ "$(command -v git)" = /usr/bin/git ]; then
+    xcode-select -p >/dev/null 2>&1 || return 1
+  fi
+  git --version >/dev/null 2>&1
 }
 
 script_dir() {
@@ -159,13 +244,12 @@ script_dir() {
 }
 
 LOCAL_DOTFILES_DIR=""
+select_install_mode
 if [ -z "${DOTFILES_BOOTSTRAP:-}" ]; then
   if dir="$(script_dir 2>/dev/null)" && [ -f "${dir}/scripts/install_local.sh" ]; then
     LOCAL_DOTFILES_DIR="$(cd "${dir}" && pwd)"
   fi
 fi
-
-install_prerequisites
 
 if [ -n "${LOCAL_DOTFILES_DIR}" ]; then
   DOTFILES_DIR="${LOCAL_DOTFILES_DIR}"
@@ -173,6 +257,8 @@ if [ -n "${LOCAL_DOTFILES_DIR}" ]; then
   export DOTFILES_BOOTSTRAP=1
   run_local_installer
 fi
+
+install_prerequisites
 
 if [ ! -d "${DOTFILES_DIR}" ]; then
   echo "Cloning dotfiles into ${DOTFILES_DIR}..."

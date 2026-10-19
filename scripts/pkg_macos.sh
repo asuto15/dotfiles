@@ -39,6 +39,407 @@ print_failed_steps() {
   return 0
 }
 
+# A component is an intentionally small, independently selectable part of the
+# macOS environment. `app-store` is internal: it is selected automatically
+# whenever an App Store application group needs the `mas` command.
+MACOS_PUBLIC_COMPONENTS=(
+  core
+  development
+  infrastructure
+  editors
+  vscode
+  vscode-extensions
+  work
+  personal
+  desktop
+  japanese
+  fonts
+  ai
+  rust-tools
+  rust-projects
+  tailscale
+)
+MACOS_SELECTED_COMPONENTS=""
+MACOS_SAVED_COMPONENTS=""
+MACOS_STATE_LOADED=0
+
+macos_component_is_valid() {
+  case "$1" in
+    core|development|infrastructure|editors|vscode|vscode-extensions|work|personal|desktop|japanese|fonts|ai|rust-tools|rust-projects|tailscale|app-store)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
+macos_components_contain() {
+  local components="$1"
+  local component="$2"
+
+  case " ${components} " in
+    *" ${component} "*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+macos_component_selected() {
+  macos_components_contain "${MACOS_SELECTED_COMPONENTS:-}" "$1"
+}
+
+add_macos_component() {
+  local component="$1"
+
+  if ! macos_component_is_valid "${component}"; then
+    echo "warn: unknown macOS component: ${component}" >&2
+    return 1
+  fi
+  if ! macos_component_selected "${component}"; then
+    MACOS_SELECTED_COMPONENTS="${MACOS_SELECTED_COMPONENTS}${MACOS_SELECTED_COMPONENTS:+ }${component}"
+  fi
+}
+
+remove_macos_component() {
+  local component="$1"
+  local selected=""
+  local item
+
+  for item in ${MACOS_SELECTED_COMPONENTS:-}; do
+    [ "${item}" = "${component}" ] && continue
+    selected="${selected}${selected:+ }${item}"
+  done
+  MACOS_SELECTED_COMPONENTS="${selected}"
+}
+
+macos_public_selected_components() {
+  local component
+  local selected=""
+
+  for component in "${MACOS_PUBLIC_COMPONENTS[@]}"; do
+    if macos_component_selected "${component}"; then
+      selected="${selected}${selected:+ }${component}"
+    fi
+  done
+  printf '%s\n' "${selected}"
+}
+
+parse_macos_components() {
+  local requested="$1"
+  local component
+  local -a requested_components=()
+  local IFS=','
+
+  MACOS_SELECTED_COMPONENTS=""
+  case "${requested}" in
+    none)
+      return 0
+      ;;
+    all)
+      for component in "${MACOS_PUBLIC_COMPONENTS[@]}"; do
+        add_macos_component "${component}"
+      done
+      return 0
+      ;;
+  esac
+
+  read -r -a requested_components <<<"${requested}"
+  if [ "${#requested_components[@]}" -eq 0 ]; then
+    echo "DOTFILES_MACOS_COMPONENTS must name one or more components, all, or none." >&2
+    return 1
+  fi
+
+  for component in "${requested_components[@]}"; do
+    case "${component}" in
+      ""|all|none)
+        echo "DOTFILES_MACOS_COMPONENTS cannot mix ${component:-an empty value} with named components." >&2
+        return 1
+        ;;
+    esac
+    if macos_component_is_valid "${component}" && [ "${component}" != "app-store" ]; then
+      add_macos_component "${component}"
+    else
+        echo "Unknown macOS component: ${component}" >&2
+        echo "Available components: ${MACOS_PUBLIC_COMPONENTS[*]}, all, none" >&2
+        return 1
+    fi
+  done
+}
+
+macos_install_state_file() {
+  printf '%s\n' "${DOTFILES_MACOS_STATE_FILE:-${XDG_CONFIG_HOME:-${HOME}/.config}/dotfiles/macos-install.env}"
+}
+
+load_macos_install_state() {
+  local file key value
+
+  file="$(macos_install_state_file)"
+  [ -f "${file}" ] || return 0
+
+  while IFS='=' read -r key value; do
+    [ "${key}" = "MACOS_COMPONENTS" ] || continue
+    if parse_macos_components "${value}"; then
+      MACOS_SAVED_COMPONENTS="${MACOS_SELECTED_COMPONENTS}"
+      MACOS_SELECTED_COMPONENTS=""
+      MACOS_STATE_LOADED=1
+    else
+      echo "warn: ignoring invalid macOS selection in ${file}." >&2
+      MACOS_SELECTED_COMPONENTS=""
+    fi
+    return 0
+  done < "${file}"
+}
+
+save_macos_install_state() {
+  local file dir tmp selected
+
+  file="$(macos_install_state_file)"
+  dir="$(dirname "${file}")"
+  selected="$(macos_public_selected_components)"
+  if [ -n "${selected}" ]; then
+    selected="${selected// /,}"
+  else
+    selected="none"
+  fi
+
+  mkdir -p "${dir}" || return 1
+  tmp="$(mktemp "${dir}/macos-install.env.XXXXXX")" || return 1
+  printf 'MACOS_COMPONENTS=%s\n' "${selected}" > "${tmp}" || {
+    rm -f "${tmp}"
+    return 1
+  }
+  chmod 0600 "${tmp}"
+  mv "${tmp}" "${file}"
+}
+
+macos_selection_default() {
+  local component="$1"
+
+  if [ "${MACOS_STATE_LOADED}" = "1" ]; then
+    if macos_components_contain "${MACOS_SAVED_COMPONENTS}" "${component}"; then
+      printf '%s\n' y
+    else
+      printf '%s\n' n
+    fi
+    return
+  fi
+
+  if [ "${component}" = "core" ]; then
+    printf '%s\n' y
+  else
+    printf '%s\n' n
+  fi
+}
+
+prompt_macos_yes_no() {
+  local prompt="$1"
+  local default="$2"
+  local answer hint
+
+  [ "${default}" = "y" ] && hint="[Y/n]" || hint="[y/N]"
+  while :; do
+    if ! read -r -p "${prompt} ${hint} " answer; then
+      return 1
+    fi
+    answer="${answer:-${default}}"
+    case "${answer}" in
+      y|Y) return 0 ;;
+      n|N) return 1 ;;
+      *) echo "Please answer y or n." ;;
+    esac
+  done
+}
+
+prompt_for_macos_components() {
+  local component description default index
+  local -a components=(
+    core
+    development
+    infrastructure
+    editors
+    vscode
+    vscode-extensions
+    work
+    personal
+    desktop
+    japanese
+    fonts
+    ai
+    rust-tools
+    rust-projects
+    tailscale
+  )
+  local -a descriptions=(
+    "core command-line tools"
+    "language runtimes, compilers, and development tools"
+    "containers, networking, server, and virtual-machine tools"
+    "Alacritty, Neovim, and Zed"
+    "Visual Studio Code"
+    "the curated Visual Studio Code extensions"
+    "work applications, credentials, cloud storage, and Office apps"
+    "personal Mac App Store applications"
+    "window management and desktop utilities"
+    "Japanese input methods"
+    "shared programming and Japanese fonts"
+    "Ollama plus Codex and Claude Code CLIs"
+    "the Rust toolchain and Cargo CLI tools"
+    "personal Rust project checkouts and binaries"
+    "Tailscale"
+  )
+
+  echo "Select macOS software components. Unselected components are not installed."
+  for index in "${!components[@]}"; do
+    component="${components[${index}]}"
+    description="${descriptions[${index}]}"
+    default="$(macos_selection_default "${component}")"
+    if prompt_macos_yes_no "Install ${description}?" "${default}"; then
+      add_macos_component "${component}"
+    fi
+  done
+}
+
+apply_macos_component_flag() {
+  local variable_name="$1"
+  local component="$2"
+  local value="$3"
+
+  case "${value}" in
+    1) add_macos_component "${component}" ;;
+    0) remove_macos_component "${component}" ;;
+    *)
+      echo "${variable_name} must be 0 or 1 (got: ${value})." >&2
+      return 1
+      ;;
+  esac
+}
+
+apply_legacy_macos_component_flags() {
+  if [ "${INSTALL_AI_CLI+x}" = x ]; then
+    apply_macos_component_flag INSTALL_AI_CLI ai "${INSTALL_AI_CLI}"
+  fi
+  if [ "${INSTALL_RUST_TOOLS+x}" = x ]; then
+    apply_macos_component_flag INSTALL_RUST_TOOLS rust-tools "${INSTALL_RUST_TOOLS}"
+  fi
+  if [ "${INSTALL_RUST_PROJECTS+x}" = x ]; then
+    apply_macos_component_flag INSTALL_RUST_PROJECTS rust-projects "${INSTALL_RUST_PROJECTS}"
+  fi
+  if [ "${INSTALL_VSCODE_EXTENSIONS+x}" = x ]; then
+    apply_macos_component_flag INSTALL_VSCODE_EXTENSIONS vscode-extensions "${INSTALL_VSCODE_EXTENSIONS}"
+  fi
+  if [ "${INSTALL_FONTS+x}" = x ]; then
+    apply_macos_component_flag INSTALL_FONTS fonts "${INSTALL_FONTS}"
+  fi
+  if [ "${INSTALL_TAILSCALE+x}" = x ]; then
+    apply_macos_component_flag INSTALL_TAILSCALE tailscale "${INSTALL_TAILSCALE}"
+  fi
+}
+
+resolve_macos_component_dependencies() {
+  if macos_component_selected vscode-extensions; then
+    add_macos_component vscode
+  fi
+  if macos_component_selected rust-projects; then
+    add_macos_component rust-tools
+  fi
+  if macos_component_selected work || macos_component_selected personal; then
+    add_macos_component app-store
+  fi
+}
+
+select_macos_components() {
+  local interaction="${DOTFILES_MACOS_INTERACTIVE:-auto}"
+
+  # Minimal is an explicit ceiling, including saved choices and legacy flags.
+  if [ "${DOTFILES_MINIMAL:-0}" = "1" ]; then
+    MACOS_SELECTED_COMPONENTS=""
+    MACOS_SAVED_COMPONENTS=""
+    MACOS_STATE_LOADED=0
+    if ! save_macos_install_state; then
+      echo "warn: failed to save the macOS component selection." >&2
+    fi
+    echo "Minimal setup: only dotfiles will be linked; no software will be installed."
+    return 0
+  fi
+
+  case "${interaction}" in
+    auto|0|1) ;;
+    *)
+      echo "DOTFILES_MACOS_INTERACTIVE must be auto, 0, or 1 (got: ${interaction})." >&2
+      return 1
+      ;;
+  esac
+  if [ "${interaction}" = "1" ] && [ ! -t 0 ]; then
+    echo "DOTFILES_MACOS_INTERACTIVE=1 requires a TTY." >&2
+    return 1
+  fi
+
+  MACOS_SELECTED_COMPONENTS=""
+  MACOS_SAVED_COMPONENTS=""
+  MACOS_STATE_LOADED=0
+  if [ -n "${DOTFILES_MACOS_COMPONENTS:-}" ]; then
+    parse_macos_components "${DOTFILES_MACOS_COMPONENTS}" || return 1
+  else
+    load_macos_install_state || return 1
+    if [ "${interaction}" != "0" ] && [ -t 0 ]; then
+      prompt_for_macos_components || return 1
+    elif [ "${MACOS_STATE_LOADED}" = "1" ]; then
+      MACOS_SELECTED_COMPONENTS="${MACOS_SAVED_COMPONENTS}"
+    fi
+  fi
+
+  apply_legacy_macos_component_flags || return 1
+  resolve_macos_component_dependencies || return 1
+
+  if ! save_macos_install_state; then
+    echo "warn: failed to save the macOS component selection." >&2
+  fi
+
+  local selected
+  selected="$(macos_public_selected_components)"
+  if [ -n "${selected}" ]; then
+    echo "Selected macOS components: ${selected}"
+  else
+    echo "No macOS software components selected; only dotfiles will be linked."
+  fi
+}
+
+validate_macos_brewfile_components() {
+  local brewfile="${1:-${DOTFILES_DIR}/Brewfile}"
+  local valid_components=" core development infrastructure editors vscode vscode-extensions work personal desktop japanese fonts ai rust-tools rust-projects tailscale app-store "
+
+  awk -v valid_components="${valid_components}" '
+    /^# dotfiles-component: / {
+      component = $0
+      sub(/^# dotfiles-component: /, "", component)
+      if (index(valid_components, " " component " ") == 0) {
+        print "unknown Brewfile component: " component > "/dev/stderr"
+        failed = 1
+      }
+      next
+    }
+    /^(tap|brew|cask|cask_args|mas|vscode) / && component == "" {
+      print "Brewfile entry is missing a dotfiles component: " $0 > "/dev/stderr"
+      failed = 1
+    }
+    END { exit failed }
+  ' "${brewfile}"
+}
+
+render_selected_macos_brewfile() {
+  local output_file="$1"
+  local brewfile="${DOTFILES_DIR}/Brewfile"
+
+  validate_macos_brewfile_components "${brewfile}" || return 1
+  awk -v selected=" ${MACOS_SELECTED_COMPONENTS} " '
+    /^# dotfiles-component: / {
+      component = $0
+      sub(/^# dotfiles-component: /, "", component)
+      next
+    }
+    component != "" && index(selected, " " component " ") > 0 { print }
+  ' "${brewfile}" > "${output_file}"
+}
+
 ensure_cargo_binstall() {
   if command -v cargo-binstall >/dev/null 2>&1; then
     return
@@ -124,6 +525,7 @@ ensure_cargo_binstall() {
 }
 
 ensure_homebrew() {
+  local homebrew_installer
   if command -v brew >/dev/null 2>&1; then
     return
   fi
@@ -152,7 +554,15 @@ ensure_homebrew() {
   fi
 
   echo "Installing Homebrew..."
-  NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+  # Check the download separately: bash -c "" would otherwise report success.
+  homebrew_installer="$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)" || return 1
+  # A curl | sh bootstrap has piped stdin, but can still have a controlling
+  # terminal. Let Homebrew authenticate sudo itself on that terminal.
+  if [ -z "${NONINTERACTIVE:-}${CI:-}" ] && { : </dev/tty; } 2>/dev/null; then
+    /bin/bash -c "${homebrew_installer}" </dev/tty || return 1
+  else
+    NONINTERACTIVE=1 /bin/bash -c "${homebrew_installer}" || return 1
+  fi
 
   if [ -x /opt/homebrew/bin/brew ]; then
     eval "$(/opt/homebrew/bin/brew shellenv)"
@@ -165,24 +575,53 @@ ensure_homebrew() {
 }
 
 ensure_homebrew_bundle_trust() {
+  local brewfile="$1"
+
   if ! brew trust --help >/dev/null 2>&1; then
     return 0
   fi
 
-  local formula cask
-  for formula in \
-    cloudflare/cloudflare/cf-terraforming \
-    xcodesorg/made/xcodes
-  do
-    brew trust --formula "${formula}" || return 1
-  done
+  if grep -Fqx 'brew "cloudflare/cloudflare/cf-terraforming"' "${brewfile}"; then
+    brew trust --formula cloudflare/cloudflare/cf-terraforming || return 1
+  fi
+  if grep -Fqx 'brew "xcodesorg/made/xcodes"' "${brewfile}"; then
+    brew trust --formula xcodesorg/made/xcodes || return 1
+  fi
+  if grep -Fqx 'cask "beutton/brew/wattsec"' "${brewfile}"; then
+    brew trust --cask beutton/brew/wattsec || return 1
+  fi
+  if grep -Fqx 'cask "nikitabobko/tap/aerospace"' "${brewfile}"; then
+    brew trust --cask nikitabobko/tap/aerospace || return 1
+  fi
+}
 
-  for cask in \
-    beutton/brew/wattsec \
-    nikitabobko/tap/aerospace
-  do
-    brew trust --cask "${cask}" || return 1
-  done
+install_selected_macos_brewfile() {
+  local bundle_file
+
+  bundle_file="$(mktemp "${TMPDIR:-/tmp}/dotfiles-brewfile.XXXXXX")" || return 1
+  if ! render_selected_macos_brewfile "${bundle_file}"; then
+    rm -f "${bundle_file}"
+    return 1
+  fi
+
+  if [ ! -s "${bundle_file}" ]; then
+    rm -f "${bundle_file}"
+    return 0
+  fi
+
+  echo "Trusting selected third-party Homebrew entries..."
+  if ! ensure_homebrew_bundle_trust "${bundle_file}"; then
+    rm -f "${bundle_file}"
+    return 1
+  fi
+
+  echo "Applying selected Homebrew entries..."
+  if ! brew bundle --file "${bundle_file}"; then
+    rm -f "${bundle_file}"
+    return 1
+  fi
+
+  rm -f "${bundle_file}"
 }
 
 install_from_list() {
@@ -497,34 +936,49 @@ write_secondary_install_receipt() {
 }
 
 install_secondary_user_environment() {
+  local shared_components
+
   configure_secondary_user_scope
   write_secondary_install_receipt
 
   echo "Secondary role: reusing ${BREW_PREFIX} without modifying Homebrew."
   export HOMEBREW_NO_AUTO_UPDATE=1
 
-  if [ "${INSTALL_AI_CLI:-1}" = "1" ]; then
+  shared_components="$(macos_public_selected_components)"
+  if [ -n "${shared_components}" ]; then
+    echo "Selected shared components are managed by the primary Homebrew owner: ${shared_components}"
+  fi
+
+  if macos_component_selected ai; then
     run_step "install user-scoped Codex/Claude Code CLI" install_ai_clis
   fi
-  if [ "${INSTALL_RUST_TOOLS:-1}" = "1" ]; then
+  if macos_component_selected rust-tools; then
     run_step "install user-scoped rustup toolchain" install_rustup
     run_step "install user-scoped cargo tools" install_cargo_tools
   fi
-  if [ "${INSTALL_RUST_PROJECTS:-1}" = "1" ]; then
+  if macos_component_selected rust-projects; then
     run_step "install user-scoped Rust projects" install_rust_projects
   fi
-  if [ "${INSTALL_VSCODE_EXTENSIONS:-1}" = "1" ]; then
+  if macos_component_selected vscode-extensions; then
     run_step "install user-scoped VS Code extensions" install_vscode_extensions
   fi
-  if [ "${INSTALL_FONTS:-1}" = "1" ]; then
+  if macos_component_selected fonts; then
     run_step "verify shared Homebrew fonts" verify_shared_homebrew_fonts
+  fi
+  if macos_component_selected tailscale; then
+    echo "Secondary role: Tailscale is machine-managed and was not installed."
   fi
 
   print_failed_steps
 }
 
 install_packages() {
-  ensure_homebrew
+  select_macos_components
+  if [ -z "${MACOS_SELECTED_COMPONENTS}" ]; then
+    return 0
+  fi
+
+  ensure_homebrew || return 1
   if ! command -v ensure_brew_prefix >/dev/null 2>&1; then
     source "${DOTFILES_DIR}/shell/path_helpers.sh"
   fi
@@ -542,40 +996,30 @@ install_packages() {
     record_failure "brew update" "$?"
   fi
 
-  # Prefer Brewfile if present for full environment parity.
   if [ -f "${DOTFILES_DIR}/Brewfile" ]; then
-    echo "Trusting Brewfile third-party entries..."
-    if ensure_homebrew_bundle_trust; then
-      :
-    else
-      record_failure "brew trust Brewfile entries" "$?"
-    fi
+    run_step "apply selected Homebrew entries" install_selected_macos_brewfile
 
-    echo "Applying Brewfile..."
-    if brew bundle --file "${DOTFILES_DIR}/Brewfile"; then
-      :
-    else
-      record_failure "brew bundle" "$?"
-    fi
-
-    if [ "${INSTALL_FONTS:-1}" = "1" ]; then
+    if macos_component_selected fonts; then
       run_step "migrate Homebrew fonts to shared directory" ensure_shared_homebrew_fonts
     fi
   fi
 
-  run_step "install common Homebrew packages" install_from_list "${DOTFILES_DIR}/packages/common.txt"
-  run_step "install macOS Homebrew packages" install_from_list "${DOTFILES_DIR}/packages/macos.txt"
-
-  run_step "install Codex/Claude Code CLI" install_ai_clis
-  if [ "${INSTALL_RUST_TOOLS:-1}" = "1" ]; then
+  if macos_component_selected ai; then
+    run_step "install Codex/Claude Code CLI" install_ai_clis
+  fi
+  if macos_component_selected rust-tools; then
     run_step "install rustup" install_rustup
     run_step "install cargo tools" install_cargo_tools
   fi
-  if [ "${INSTALL_RUST_PROJECTS:-1}" = "1" ]; then
+  if macos_component_selected rust-projects; then
     run_step "install Rust projects" install_rust_projects
   fi
 
-  if [ "${INSTALL_TAILSCALE:-0}" = "1" ]; then
+  if macos_component_selected vscode-extensions; then
+    run_step "install VS Code extensions" install_vscode_extensions
+  fi
+
+  if macos_component_selected tailscale; then
     run_step "install Tailscale" install_tailscale_macos
   fi
 

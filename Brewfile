@@ -1,7 +1,32 @@
-tap "beutton/brew"
-tap "cloudflare/cloudflare"
-tap "homebrew/services"
-tap "nikitabobko/tap"
+# dotfiles-component: core
+brew "baobab"
+brew "bat"
+brew "coreutils"
+brew "curl"
+brew "eza"
+brew "fd"
+brew "fzf"
+brew "gh"
+brew "git"
+brew "htop"
+brew "httpie"
+brew "jq"
+brew "ncdu"
+brew "p7zip"
+brew "ripgrep"
+brew "starship"
+brew "tldr"
+brew "tmux"
+brew "tree"
+brew "unar"
+brew "watch"
+brew "wget"
+brew "z"
+brew "zsh-autocomplete"
+brew "zsh-autosuggestions"
+brew "zsh-completions"
+
+# dotfiles-component: development
 tap "xcodesorg/made"
 brew "libtiff"
 brew "harfbuzz"
@@ -9,98 +34,119 @@ brew "anyenv"
 brew "jpeg-xl"
 brew "webp"
 brew "aom"
-brew "arp-scan"
 brew "python@3.13"
-brew "awscli"
-brew "azure-cli"
-brew "baobab"
-brew "bat"
 brew "node"
-brew "bitwarden-cli"
-brew "caddy"
 brew "cmake"
-brew "coreutils"
-brew "coturn"
-brew "curl"
-brew "eza"
-brew "fd"
 brew "sdl2"
-brew "ffmpeg"
-brew "fluid-synth"
-brew "fzf"
 brew "gcc"
-brew "gh"
-brew "git"
-brew "gnupg"
 brew "go"
-brew "htop"
-brew "httpie"
-brew "iperf3"
-brew "iproute2mac"
 brew "jnv"
-brew "jq"
-brew "kubo"
 brew "llvm"
 brew "lld"
 brew "marp-cli"
-brew "mas"
-brew "ncdu"
-brew "neovim"
-brew "nginx"
 brew "ni"
-brew "nmap"
-brew "ollama", restart_service: :changed
-brew "p7zip"
-brew "pinentry-mac"
 brew "pkgconf"
-brew "poppler"
 brew "protobuf"
 brew "pyenv"
 brew "python@3.10"
-brew "qemu"
 brew "rbenv"
-brew "restic"
-brew "ripgrep"
 brew "ruby", link: false
-brew "rustup"
 brew "sdl2_gfx"
 brew "sdl2_image"
 brew "sdl2_mixer"
 brew "sdl2_net"
 brew "sdl2_ttf"
 brew "silicon"
-brew "starship"
-brew "telnet"
-brew "terminal-notifier"
 brew "texlive"
-brew "tfenv"
-brew "tldr"
-brew "tmux"
-brew "tree"
 brew "typst"
-brew "unar"
 brew "uv"
-brew "watch"
+brew "yarn"
+brew "xcodesorg/made/xcodes"
+
+# dotfiles-component: infrastructure
+tap "cloudflare/cloudflare"
+brew "arp-scan"
+brew "awscli"
+brew "azure-cli"
+brew "caddy"
+brew "coturn"
+brew "iperf3"
+brew "iproute2mac"
+brew "kubo"
+brew "nginx"
+brew "nmap"
+brew "qemu"
+brew "restic"
+brew "telnet"
+brew "tfenv"
 brew "websocat"
-brew "wget"
 brew "xorriso"
 brew "x86_64-elf-grub"
-brew "yarn"
-brew "z"
-brew "zsh-autocomplete"
-brew "zsh-autosuggestions"
-brew "zsh-completions"
 brew "cloudflare/cloudflare/cf-terraforming"
 brew "kraftkit"
-brew "xcodesorg/made/xcodes"
-cask_args fontdir: "/Library/Fonts"
-cask "nikitabobko/tap/aerospace"
+cask "docker-desktop"
+cask "macfuse"
+cask "multipass"
+cask "wireshark-app"
+cask "zenmap"
+
+# dotfiles-component: app-store
+brew "mas"
+
+# dotfiles-component: editors
+brew "neovim"
 cask "alacritty"
-cask "aquaskk"
+cask "zed"
+
+# dotfiles-component: vscode
+cask "visual-studio-code"
+
+# dotfiles-component: work
+brew "bitwarden-cli"
+brew "gnupg"
+brew "pinentry-mac"
+brew "poppler"
 cask "bitwarden"
+cask "git-credential-manager"
+cask "google-drive"
+cask "slack"
+mas "Microsoft Excel", id: 462058435
+mas "Microsoft PowerPoint", id: 462062816
+mas "Microsoft Remote Desktop", id: 1295203466
+mas "Microsoft Word", id: 462054704
+
+# dotfiles-component: personal
+brew "ffmpeg"
+brew "fluid-synth"
+mas "DaVinci Resolve", id: 571213070
+mas "GarageBand", id: 682658836
+mas "Goodnotes", id: 1444383602
+mas "iMovie", id: 408981434
+mas "Keynote", id: 409183694
+mas "Kindle", id: 302584613
+mas "Klack", id: 6446206067
+mas "Numbers", id: 409203825
+mas "Pages", id: 409201541
+mas "SeeMusic", id: 1494196015
+
+# dotfiles-component: desktop
+tap "beutton/brew"
+tap "nikitabobko/tap"
+brew "terminal-notifier"
+cask "nikitabobko/tap/aerospace"
 cask "clipy"
 cask "deskpad"
-cask "docker-desktop"
+cask "raycast"
+cask "rectangle"
+cask "stats"
+cask "beutton/brew/wattsec"
+
+# dotfiles-component: japanese
+cask "aquaskk"
+cask "google-japanese-ime"
+
+# dotfiles-component: fonts
+cask_args fontdir: "/Library/Fonts"
 cask "font-hack-nerd-font"
 cask "font-monaspace"
 cask "font-noto-sans-cjk-jp"
@@ -111,34 +157,15 @@ cask "font-noto-serif-jp"
 cask "font-source-han-code-jp"
 cask "font-source-han-sans-vf"
 cask "font-source-han-serif-vf"
-cask "git-credential-manager"
-cask "google-drive"
-cask "google-japanese-ime"
-cask "macfuse"
-cask "multipass"
-cask "raycast"
-cask "rectangle"
-cask "slack"
-cask "stats"
-cask "visual-studio-code"
-cask "beutton/brew/wattsec"
-cask "wireshark-app"
-cask "zed"
-cask "zenmap"
-mas "DaVinci Resolve", id: 571213070
-mas "GarageBand", id: 682658836
-mas "Goodnotes", id: 1444383602
-mas "iMovie", id: 408981434
-mas "Keynote", id: 409183694
-mas "Kindle", id: 302584613
-mas "Klack", id: 6446206067
-mas "Microsoft Excel", id: 462058435
-mas "Microsoft PowerPoint", id: 462062816
-mas "Microsoft Remote Desktop", id: 1295203466
-mas "Microsoft Word", id: 462054704
-mas "Numbers", id: 409203825
-mas "Pages", id: 409201541
-mas "SeeMusic", id: 1494196015
+
+# dotfiles-component: ai
+tap "homebrew/services"
+brew "ollama", restart_service: :changed
+
+# dotfiles-component: rust-tools
+brew "rustup"
+
+# dotfiles-component: vscode-extensions
 vscode "8amjp.charactercount"
 vscode "adamraichu.docx-viewer"
 vscode "alexcvzz.vscode-sqlite"

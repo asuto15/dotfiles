@@ -73,28 +73,30 @@ verifies that these font files exist, but does not reinstall or copy them.
 
 ## Optional secondary components
 
-Set any of these to `0` to skip the corresponding user-scoped step:
-
-```sh
-INSTALL_AI_CLI=0
-INSTALL_RUST_TOOLS=0
-INSTALL_RUST_PROJECTS=0
-INSTALL_VSCODE_EXTENSIONS=0
-INSTALL_FONTS=0
-```
+The macOS component selector also applies to a secondary user. It never changes
+the shared Homebrew installation; selected shared applications are reported as
+primary-user managed, while `ai`, `rust-tools`, `rust-projects`, and
+`vscode-extensions` install only their user-scoped parts.
 
 For example, to link only the dotfiles while reusing existing machine
 applications:
 
 ```sh
+DOTFILES_ROLE=secondary DOTFILES_MACOS_COMPONENTS=none ./install.sh
+```
+
+To install only a secondary user's Rust tools and VS Code extensions, use:
+
+```sh
 DOTFILES_ROLE=secondary \
-INSTALL_AI_CLI=0 \
-INSTALL_RUST_TOOLS=0 \
-INSTALL_RUST_PROJECTS=0 \
-INSTALL_VSCODE_EXTENSIONS=0 \
-INSTALL_FONTS=0 \
+DOTFILES_MACOS_COMPONENTS=rust-tools,vscode-extensions \
 ./install.sh
 ```
+
+`INSTALL_AI_CLI`, `INSTALL_RUST_TOOLS`, `INSTALL_RUST_PROJECTS`,
+`INSTALL_VSCODE_EXTENSIONS`, and `INSTALL_FONTS` remain compatible `0`/`1`
+overrides. See [macOS software selection](macos-software-selection.md) for the
+complete component list and unattended setup behavior.
 
 ## Removing a secondary macOS user
 
